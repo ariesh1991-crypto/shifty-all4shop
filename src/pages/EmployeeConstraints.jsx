@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tantml:react-query';
 import { format, getMonth, getYear } from 'date-fns';
 import { ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,12 +8,31 @@ import MonthCalendar from '../components/shifts/MonthCalendar';
 import ConstraintSelector from '../components/shifts/ConstraintSelector';
 import ShiftLegend from '../components/shifts/ShiftLegend';
 import { useToast } from '@/components/ui/use-toast';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const CONSTRAINT_COLORS = {
   unavailable: 'bg-red-500 text-white',
   prefer_morning: 'bg-blue-500 text-white',
   prefer_evening: 'bg-purple-500 text-white',
   special_hours_only: 'bg-amber-500 text-white',
+};
+
+const SHIFT_COLORS = {
+  morning_type1: 'bg-blue-200',
+  evening_type1: 'bg-purple-200',
+  morning_type2: 'bg-cyan-200',
+  evening_type2: 'bg-green-200',
+  friday_a: 'bg-yellow-200',
+  friday_b: 'bg-orange-200',
+};
+
+const SHIFT_LABELS = {
+  morning_type1: 'בוקר 1',
+  evening_type1: 'ערב 1',
+  morning_type2: 'בוקר 2',
+  evening_type2: 'ערב 2',
+  friday_a: 'שישי A',
+  friday_b: 'שישי B',
 };
 
 export default function EmployeeConstraints() {
@@ -27,6 +46,7 @@ export default function EmployeeConstraints() {
 
   const year = getYear(currentDate);
   const month = getMonth(currentDate) + 1;
+  const monthKey = `${year}-${String(month).padStart(2, '0')}`;
 
   useEffect(() => {
     const loadCurrentEmployee = async () => {
@@ -50,6 +70,18 @@ export default function EmployeeConstraints() {
       if (!currentEmployee) return [];
       return await base44.entities.Constraint.filter({
         employee_id: currentEmployee.id,
+      });
+    },
+    enabled: !!currentEmployee,
+  });
+
+  const { data: shifts = [] } = useQuery({
+    queryKey: ['employee-shifts', currentEmployee?.id, monthKey],
+    queryFn: async () => {
+      if (!currentEmployee) return [];
+      return await base44.entities.Shift.filter({
+        employee_id: currentEmployee.id,
+        month: monthKey,
       });
     },
     enabled: !!currentEmployee,
@@ -84,6 +116,11 @@ export default function EmployeeConstraints() {
     return constraints.find((c) => c.date === dateStr);
   };
 
+  const getShiftsForDate = (date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return shifts.filter((s) => s.date === dateStr);
+  };
+
   const handleDayClick = (date) => {
     setSelectedDate(format(date, 'yyyy-MM-dd'));
     setDialogOpen(true);
@@ -115,7 +152,7 @@ export default function EmployeeConstraints() {
     setDialogOpen(false);
   };
 
-  const renderDay = (date) => {
+  const renderConstraintDay = (date) => {
     const constraint = getConstraintForDate(date);
     const dayNumber = format(date, 'd');
     const isWeekend = format(date, 'i') === '6' || format(date, 'i') === '7';
@@ -136,6 +173,34 @@ export default function EmployeeConstraints() {
             {constraint.special_hours}
           </div>
         )}
+      </div>
+    );
+  };
+
+  const renderShiftDay = (date) => {
+    const dayShifts = getShiftsForDate(date);
+    const dayNumber = format(date, 'd');
+    const isWeekend = format(date, 'i') === '6' || format(date, 'i') === '7';
+
+    return (
+      <div
+        key={date.toString()}
+        className={`
+          p-2 border rounded-lg min-h-[80px]
+          ${isWeekend ? 'bg-gray-100 border-blue-300' : 'bg-white border-gray-200'}
+        `}
+      >
+        <div className="font-bold text-center mb-2">{dayNumber}</div>
+        <div className="space-y-1">
+          {dayShifts.map((shift) => (
+            <div
+              key={shift.id}
+              className={`text-xs p-1 rounded ${SHIFT_COLORS[shift.shift_type]} text-center font-medium`}
+            >
+              {SHIFT_LABELS[shift.shift_type]}
+            </div>
+          ))}
+        </div>
       </div>
     );
   };
@@ -191,7 +256,7 @@ export default function EmployeeConstraints() {
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold text-gray-800">
-            האילוצים שלי - {currentEmployee.full_name}
+            {currentEmployee.full_name}
           </h1>
           <div className="flex gap-2">
             <Button onClick={goToPreviousMonth} variant="outline">
@@ -207,9 +272,22 @@ export default function EmployeeConstraints() {
           </div>
         </div>
 
-        <ShiftLegend showConstraints={true} />
-
-        <MonthCalendar year={year} month={month} renderDay={renderDay} />
+        <Tabs defaultValue="shifts" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsTrigger value="shifts">המשמרות שלי</TabsTrigger>
+            <TabsTrigger value="constraints">האילוצים שלי</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="shifts">
+            <ShiftLegend showConstraints={false} />
+            <MonthCalendar year={year} month={month} renderDay={renderShiftDay} />
+          </TabsContent>
+          
+          <TabsContent value="constraints">
+            <ShiftLegend showConstraints={true} />
+            <MonthCalendar year={year} month={month} renderDay={renderConstraintDay} />
+          </TabsContent>
+        </Tabs>
 
         <ConstraintSelector
           isOpen={dialogOpen}

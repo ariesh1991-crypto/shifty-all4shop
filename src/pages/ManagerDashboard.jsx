@@ -170,73 +170,97 @@ export default function ManagerDashboard() {
             });
           }
         } else {
-          // שיבוץ ימים רגילים
+          // שיבוץ ימים רגילים - שמירת מונה למחזור
           const type1Employees = availableEmployees.filter((emp) => emp.contract_type === 'type1');
           const type2Employees = availableEmployees.filter((emp) => emp.contract_type === 'type2');
 
-          // שיבוץ משמרת בוקר
+          // שיבוץ משמרת בוקר type1
           if (type1Employees.length > 0) {
-            const employee = type1Employees[day % type1Employees.length];
-            const pref = constraints.find(
-              (c) => c.employee_id === employee.id && c.date === dateStr
-            );
-            
-            if (!pref || pref.constraint_type !== 'prefer_evening') {
-              newShifts.push({
-                employee_id: employee.id,
-                date: dateStr,
-                shift_type: 'morning_type1',
-                month: monthKey,
-              });
+            for (let i = 0; i < type1Employees.length; i++) {
+              const employee = type1Employees[(day + i) % type1Employees.length];
+              const pref = constraints.find(
+                (c) => c.employee_id === employee.id && c.date === dateStr
+              );
+              
+              if (!pref || pref.constraint_type !== 'prefer_evening') {
+                newShifts.push({
+                  employee_id: employee.id,
+                  date: dateStr,
+                  shift_type: 'morning_type1',
+                  month: monthKey,
+                });
+                break;
+              }
             }
           }
 
+          // שיבוץ משמרת בוקר type2
           if (type2Employees.length > 0) {
-            const employee = type2Employees[day % type2Employees.length];
-            const pref = constraints.find(
-              (c) => c.employee_id === employee.id && c.date === dateStr
-            );
-            
-            if (!pref || pref.constraint_type !== 'prefer_evening') {
-              newShifts.push({
-                employee_id: employee.id,
-                date: dateStr,
-                shift_type: 'morning_type2',
-                month: monthKey,
-              });
+            for (let i = 0; i < type2Employees.length; i++) {
+              const employee = type2Employees[(day + i) % type2Employees.length];
+              const pref = constraints.find(
+                (c) => c.employee_id === employee.id && c.date === dateStr
+              );
+              
+              if (!pref || pref.constraint_type !== 'prefer_evening') {
+                newShifts.push({
+                  employee_id: employee.id,
+                  date: dateStr,
+                  shift_type: 'morning_type2',
+                  month: monthKey,
+                });
+                break;
+              }
             }
           }
 
-          // שיבוץ משמרת ערב
+          // שיבוץ משמרת ערב type1
           if (type1Employees.length > 0) {
-            const employee = type1Employees[(day + 1) % type1Employees.length];
-            const pref = constraints.find(
-              (c) => c.employee_id === employee.id && c.date === dateStr
-            );
-            
-            if (!pref || pref.constraint_type !== 'prefer_morning') {
-              newShifts.push({
-                employee_id: employee.id,
-                date: dateStr,
-                shift_type: 'evening_type1',
-                month: monthKey,
-              });
+            for (let i = 0; i < type1Employees.length; i++) {
+              const employee = type1Employees[(day + i + 1) % type1Employees.length];
+              const pref = constraints.find(
+                (c) => c.employee_id === employee.id && c.date === dateStr
+              );
+              
+              // בדיקה שהעובד לא כבר במשמרת בוקר באותו יום
+              const alreadyMorning = newShifts.some(
+                s => s.employee_id === employee.id && s.date === dateStr && s.shift_type === 'morning_type1'
+              );
+              
+              if (!alreadyMorning && (!pref || pref.constraint_type !== 'prefer_morning')) {
+                newShifts.push({
+                  employee_id: employee.id,
+                  date: dateStr,
+                  shift_type: 'evening_type1',
+                  month: monthKey,
+                });
+                break;
+              }
             }
           }
 
+          // שיבוץ משמרת ערב type2
           if (type2Employees.length > 0) {
-            const employee = type2Employees[(day + 1) % type2Employees.length];
-            const pref = constraints.find(
-              (c) => c.employee_id === employee.id && c.date === dateStr
-            );
-            
-            if (!pref || pref.constraint_type !== 'prefer_morning') {
-              newShifts.push({
-                employee_id: employee.id,
-                date: dateStr,
-                shift_type: 'evening_type2',
-                month: monthKey,
-              });
+            for (let i = 0; i < type2Employees.length; i++) {
+              const employee = type2Employees[(day + i + 1) % type2Employees.length];
+              const pref = constraints.find(
+                (c) => c.employee_id === employee.id && c.date === dateStr
+              );
+              
+              // בדיקה שהעובד לא כבר במשמרת בוקר באותו יום
+              const alreadyMorning = newShifts.some(
+                s => s.employee_id === employee.id && s.date === dateStr && s.shift_type === 'morning_type2'
+              );
+              
+              if (!alreadyMorning && (!pref || pref.constraint_type !== 'prefer_morning')) {
+                newShifts.push({
+                  employee_id: employee.id,
+                  date: dateStr,
+                  shift_type: 'evening_type2',
+                  month: monthKey,
+                });
+                break;
+              }
             }
           }
         }

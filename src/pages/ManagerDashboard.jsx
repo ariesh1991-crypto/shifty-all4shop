@@ -291,6 +291,10 @@ export default function ManagerDashboard() {
     const dayShifts = getShiftForDate(date);
     const dayNumber = format(date, 'd');
     const isWeekend = format(date, 'i') === '6' || format(date, 'i') === '7';
+    const dateStr = format(date, 'yyyy-MM-dd');
+    
+    // מציאת הערות שעות מיוחדות לאותו יום
+    const dayConstraints = constraints.filter((c) => c.date === dateStr && c.special_hours);
 
     return (
       <div
@@ -302,6 +306,23 @@ export default function ManagerDashboard() {
         `}
       >
         <div className="font-bold text-center mb-2">{dayNumber}</div>
+        
+        {dayConstraints.length > 0 && (
+          <div className="mb-2 space-y-1">
+            {dayConstraints.map((constraint) => {
+              const employee = employees.find((e) => e.id === constraint.employee_id);
+              return (
+                <div
+                  key={constraint.id}
+                  className="text-xs bg-amber-100 text-amber-800 p-1 rounded border border-amber-300"
+                >
+                  {employee?.full_name}: {constraint.special_hours}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        
         <div className="space-y-1">
           {dayShifts.map((shift) => {
             const employee = employees.find((e) => e.id === shift.employee_id);

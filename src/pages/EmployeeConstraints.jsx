@@ -82,7 +82,7 @@ export default function EmployeeConstraints() {
     setDialogOpen(true);
   };
 
-  const handleConstraintSelect = async (constraintType) => {
+  const handleConstraintSelect = async (constraintType, specialHours = '') => {
     if (!currentEmployee) return;
 
     const existingConstraint = getConstraintForDate(new Date(selectedDate));
@@ -94,13 +94,14 @@ export default function EmployeeConstraints() {
     } else if (existingConstraint) {
       await updateConstraintMutation.mutateAsync({
         id: existingConstraint.id,
-        data: { constraint_type: constraintType },
+        data: { constraint_type: constraintType, special_hours: specialHours },
       });
     } else {
       await createConstraintMutation.mutateAsync({
         employee_id: currentEmployee.id,
         date: selectedDate,
         constraint_type: constraintType,
+        special_hours: specialHours,
       });
     }
 
@@ -173,6 +174,7 @@ export default function EmployeeConstraints() {
           onClose={() => setDialogOpen(false)}
           onSelect={handleConstraintSelect}
           selectedDate={selectedDate}
+          currentConstraint={selectedDate ? getConstraintForDate(new Date(selectedDate)) : null}
         />
       </div>
     </div>

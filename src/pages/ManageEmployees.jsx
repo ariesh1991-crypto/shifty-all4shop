@@ -389,7 +389,10 @@ export default function ManageEmployees() {
           </DialogContent>
         </Dialog>
 
-        <Dialog open={approveDialogOpen} onOpenChange={setApproveDialogOpen}>
+        <Dialog open={approveDialogOpen} onOpenChange={(open) => {
+          if (!open) setSelectedUser(null);
+          setApproveDialogOpen(open);
+        }}>
           <DialogContent dir="rtl">
             <DialogHeader>
               <DialogTitle>אישור עובד חדש</DialogTitle>

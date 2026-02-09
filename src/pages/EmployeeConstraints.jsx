@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, getMonth, getYear } from 'date-fns';
-import { ChevronLeft, ChevronRight, Save } from 'lucide-react';
+import { ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import MonthCalendar from '../components/shifts/MonthCalendar';
 import ConstraintSelector from '../components/shifts/ConstraintSelector';
@@ -186,6 +186,10 @@ export default function EmployeeConstraints() {
             </Button>
             <Button onClick={goToNextMonth} variant="outline">
               <ChevronLeft className="w-5 h-5" />
+            </Button>
+            <Button onClick={() => base44.auth.logout()} variant="outline" className="text-red-600 hover:text-red-700">
+              <LogOut className="w-4 h-4 ml-2" />
+              יציאה
             </Button>
           </div>
         </div>

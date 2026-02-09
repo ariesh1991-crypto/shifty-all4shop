@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, getMonth, getYear, getDay } from 'date-fns';
-import { ChevronLeft, ChevronRight, Sparkles, Edit2, Users } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Sparkles, Edit2, Users, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import MonthCalendar from '../components/shifts/MonthCalendar';
 import ShiftLegend from '../components/shifts/ShiftLegend';
@@ -388,6 +388,11 @@ export default function ManagerDashboard() {
             </Button>
             <Button onClick={goToNextMonth} variant="outline">
               <ChevronLeft className="w-5 h-5" />
+            </Button>
+            
+            <Button onClick={() => base44.auth.logout()} variant="outline" className="text-red-600 hover:text-red-700">
+              <LogOut className="w-4 h-4 ml-2" />
+              יציאה
             </Button>
           </div>
         </div>

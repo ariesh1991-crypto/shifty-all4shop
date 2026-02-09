@@ -1,44 +1,30 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { format, getMonth, getYear, getDay } from 'date-fns';
-import { ChevronLeft, ChevronRight, Sparkles, Edit2, Users, LogOut } from 'lucide-react';
+import { format, getMonth, getYear, getDay, startOfWeek, endOfWeek, isSameWeek, parseISO, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
+import { ChevronLeft, ChevronRight, Sparkles, Users, LogOut, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import MonthCalendar from '../components/shifts/MonthCalendar';
-import ShiftLegend from '../components/shifts/ShiftLegend';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import MonthCalendar from '../components/shifts/MonthCalendar';
+import { he } from 'date-fns/locale';
 
 const SHIFT_COLORS = {
-  morning_type1: 'bg-blue-200',
-  evening_type1: 'bg-purple-200',
-  morning_type2: 'bg-cyan-200',
-  evening_type2: 'bg-green-200',
-  friday_a: 'bg-yellow-200',
-  friday_b: 'bg-orange-200',
+  'קצרה': 'bg-blue-200',
+  'ארוכה': 'bg-purple-200',
+  'שישי קצר': 'bg-yellow-200',
+  'שישי ארוך': 'bg-orange-200',
 };
 
-const SHIFT_LABELS = {
-  morning_type1: 'בוקר 1',
-  evening_type1: 'ערב 1',
-  morning_type2: 'בוקר 2',
-  evening_type2: 'ערב 2',
-  friday_a: 'שישי A',
-  friday_b: 'שישי B',
+const STATUS_COLORS = {
+  'תקין': 'border-green-500',
+  'בעיה': 'border-red-500',
+  'חריגה מאושרת': 'border-amber-500',
 };
 
 export default function ManagerDashboard() {
@@ -46,38 +32,8 @@ export default function ManagerDashboard() {
   const [selectedDate, setSelectedDate] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-
-  // בדיקת הרשאות מנהל
-  React.useEffect(() => {
-    const checkAdmin = async () => {
-      try {
-        const user = await base44.auth.me();
-        if (user.role !== 'admin') {
-          toast({
-            title: 'אין הרשאה',
-            description: 'רק מנהלים יכולים לגשת לדף זה',
-            variant: 'destructive',
-          });
-          window.location.href = createPageUrl('EmployeeConstraints');
-          return;
-        }
-        setIsAdmin(true);
-      } catch (error) {
-        toast({
-          title: 'שגיאה',
-          description: 'לא ניתן לאמת הרשאות',
-          variant: 'destructive',
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-    checkAdmin();
-  }, [toast]);
 
   const year = getYear(currentDate);
   const month = getMonth(currentDate) + 1;
@@ -89,13 +45,11 @@ export default function ManagerDashboard() {
   });
 
   const { data: shifts = [] } = useQuery({
-    queryKey: ['shifts', monthKey],
-    queryFn: () => base44.entities.Shift.filter({ month: monthKey }),
-  });
-
-  const { data: constraints = [] } = useQuery({
-    queryKey: ['all-constraints'],
-    queryFn: () => base44.entities.Constraint.list(),
+    queryKey: ['shifts', year, month],
+    queryFn: async () => {
+      const allShifts = await base44.entities.Shift.list();
+      return allShifts.filter(s => s.date && s.date.startsWith(monthKey));
+    },
   });
 
   const createShiftMutation = useMutation({
@@ -109,7 +63,7 @@ export default function ManagerDashboard() {
     mutationFn: ({ id, data }) => base44.entities.Shift.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries(['shifts']);
-      toast({ title: 'המשמרת עודכנה בהצלחה' });
+      toast({ title: 'המשמרת עודכנה' });
     },
   });
 
@@ -120,312 +74,183 @@ export default function ManagerDashboard() {
     },
   });
 
-  const getShiftForDate = (date) => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    return shifts.filter((s) => s.date === dateStr);
+  const validateShift = (shift, allShifts, employees) => {
+    const employee = employees.find(e => e.id === shift.assigned_employee_id);
+    if (!employee) return { status: 'בעיה', reason: 'עובד לא קיים' };
+    
+    // כלל 6: לא זמין
+    if (employee.unavailable) {
+      return { status: 'בעיה', reason: 'עובד מסומן כלא זמין' };
+    }
+
+    const shiftDate = parseISO(shift.date);
+    const weekStart = startOfWeek(shiftDate, { weekStartsOn: 0 });
+    const weekEnd = endOfWeek(shiftDate, { weekStartsOn: 0 });
+    
+    // משמרות העובד באותו שבוע (ללא שישי)
+    const weekShifts = allShifts.filter(s => 
+      s.assigned_employee_id === employee.id &&
+      s.date >= format(weekStart, 'yyyy-MM-dd') &&
+      s.date <= format(weekEnd, 'yyyy-MM-dd') &&
+      !s.shift_type.includes('שישי')
+    );
+
+    // כלל 1: מקסימום 2 משמרות בשבוע
+    if (weekShifts.length > 2 && !shift.shift_type.includes('שישי')) {
+      return { status: 'בעיה', reason: 'חריגה מ-2 משמרות בשבוע' };
+    }
+
+    // כלל 4: חמישי ארוכה → אין שישי למחרת
+    const dayOfWeek = getDay(shiftDate);
+    if (dayOfWeek === 5 && shift.shift_type.includes('שישי')) {
+      const yesterday = format(new Date(shiftDate.getTime() - 86400000), 'yyyy-MM-dd');
+      const thursdayLong = allShifts.find(s => 
+        s.date === yesterday && 
+        s.assigned_employee_id === employee.id && 
+        s.shift_type === 'ארוכה'
+      );
+      if (thursdayLong) {
+        return { status: 'בעיה', reason: 'עשה חמישי ארוכה אתמול' };
+      }
+    }
+
+    // כלל 5: שישי רצוף / יותר משישי אחד בחודש
+    if (shift.shift_type.includes('שישי')) {
+      const monthShifts = allShifts.filter(s => 
+        s.assigned_employee_id === employee.id &&
+        s.date.startsWith(monthKey) &&
+        s.shift_type.includes('שישי')
+      );
+      
+      if (monthShifts.length > 1) {
+        return { status: 'בעיה', reason: 'יותר משישי אחד בחודש' };
+      }
+      
+      if (employee.last_friday_date) {
+        const lastFriday = parseISO(employee.last_friday_date);
+        const daysDiff = Math.floor((shiftDate - lastFriday) / (1000 * 60 * 60 * 24));
+        if (daysDiff === 7) {
+          return { status: 'בעיה', reason: 'שישי רצוף' };
+        }
+      }
+    }
+
+    return { status: 'תקין', reason: '' };
   };
 
   const generateSchedule = async () => {
     setGenerating(true);
     try {
-      const monthStart = new Date(year, month - 1, 1);
-      const monthEnd = new Date(year, month, 0);
-      const daysInMonth = monthEnd.getDate();
-
-      // מחיקת משמרות קיימות של החודש
-      if (shifts.length > 0) {
-        try {
-          for (const shift of shifts) {
-            try {
-              await deleteShiftMutation.mutateAsync(shift.id);
-            } catch (err) {
-              console.log(`לא ניתן למחוק משמרת ${shift.id}:`, err);
-            }
-          }
-          // המתנה קצרה כדי לא לעבור את ה-rate limit
-          await new Promise(resolve => setTimeout(resolve, 300));
-        } catch (error) {
-          console.error('שגיאה במחיקת משמרות:', error);
-        }
+      // מחיקת משמרות קיימות
+      for (const shift of shifts) {
+        await deleteShiftMutation.mutateAsync(shift.id);
       }
+
+      const monthStart = startOfMonth(new Date(year, month - 1));
+      const monthEnd = endOfMonth(new Date(year, month - 1));
+      const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
       const newShifts = [];
+      const activeEmployees = employees.filter(e => e.active && !e.unavailable);
       
-      // מעקב אחרי משמרות שבועיות לכל עובד
-      const weeklyShifts = {};
-      employees.forEach(emp => {
-        weeklyShifts[emp.id] = { morning: false, evening: false, count: 0 };
-      });
+      let shortIndex = 0;
+      let longIndex = 0;
 
-      // מונה לסיבוב עובדים
-      let type1MorningIndex = 0;
-      let type1EveningIndex = 0;
-      let type2MorningIndex = 0;
-      let type2EveningIndex = 0;
-      let fridayIndex = 0;
+      for (const day of days) {
+        const dayOfWeek = getDay(day);
+        if (dayOfWeek === 6) continue; // דלג על שבת
 
-      for (let day = 1; day <= daysInMonth; day++) {
-        const date = new Date(year, month - 1, day);
-        const dateStr = format(date, 'yyyy-MM-dd');
-        const dayOfWeek = getDay(date);
-
-        // דלג על שבתות
-        if (dayOfWeek === 6) continue;
-
-        // איפוס מונה שבועי בתחילת כל שבוע (יום ראשון)
-        if (dayOfWeek === 0) {
-          Object.keys(weeklyShifts).forEach(empId => {
-            weeklyShifts[empId] = { morning: false, evening: false, count: 0 };
-          });
-        }
-
+        const dateStr = format(day, 'yyyy-MM-dd');
         const isFriday = dayOfWeek === 5;
 
-        // עובדים זמינים לאותו יום
-        const availableEmployees = employees.filter((emp) => {
-          const hasUnavailableConstraint = constraints.some(
-            (c) => c.employee_id === emp.id && c.date === dateStr && c.constraint_type === 'unavailable'
-          );
-          return !hasUnavailableConstraint;
-        });
-
         if (isFriday) {
-          // שיבוץ שישי - 2 עובדים (A ו-B)
-          const sortedByWorkload = [...availableEmployees].sort((a, b) => 
-            weeklyShifts[a.id].count - weeklyShifts[b.id].count
-          );
-
-          const fridayCandidates = sortedByWorkload.filter(emp => weeklyShifts[emp.id].count < 2);
-          
-          if (fridayCandidates.length >= 2) {
+          // שישי - 2 עובדים
+          if (activeEmployees.length >= 2) {
             newShifts.push({
-              employee_id: fridayCandidates[0].id,
               date: dateStr,
-              shift_type: 'friday_a',
-              month: monthKey,
+              shift_type: 'שישי קצר',
+              assigned_employee_id: activeEmployees[0].id,
+              status: 'תקין',
             });
-            weeklyShifts[fridayCandidates[0].id].count++;
-            
             newShifts.push({
-              employee_id: fridayCandidates[1].id,
               date: dateStr,
-              shift_type: 'friday_b',
-              month: monthKey,
+              shift_type: 'שישי ארוך',
+              assigned_employee_id: activeEmployees[1].id,
+              status: 'תקין',
             });
-            weeklyShifts[fridayCandidates[1].id].count++;
-          } else if (fridayCandidates.length === 1) {
-            newShifts.push({
-              employee_id: fridayCandidates[0].id,
-              date: dateStr,
-              shift_type: 'friday_a',
-              month: monthKey,
-            });
-            weeklyShifts[fridayCandidates[0].id].count++;
           }
         } else {
-          // שיבוץ ימים רגילים - 4 משמרות ליום
-          const type1Employees = availableEmployees.filter((emp) => emp.contract_type === 'type1');
-          const type2Employees = availableEmployees.filter((emp) => emp.contract_type === 'type2');
+          // יום רגיל - משמרת קצרה וארוכה
+          const contract1 = activeEmployees.filter(e => e.contract_type === 'חוזה 1');
+          const contract2 = activeEmployees.filter(e => e.contract_type === 'חוזה 2');
 
-          // פונקציה למציאת עובד למשמרת
-          const findEmployeeForShift = (employees, startIndex, isEvening = false) => {
-            // מעבר ראשון: עובדים שמתאימים לחלוטין (העדפות + לא עבר הלימיט)
-            for (let i = 0; i < employees.length; i++) {
-              const empIndex = (startIndex + i) % employees.length;
-              const emp = employees[empIndex];
-              const alreadyWorkedToday = newShifts.some(s => s.employee_id === emp.id && s.date === dateStr);
-              const workedThisShiftType = isEvening ? weeklyShifts[emp.id].evening : weeklyShifts[emp.id].morning;
-              
-              if (!workedThisShiftType && weeklyShifts[emp.id].count < 2 && !alreadyWorkedToday) {
-                const pref = constraints.find(c => c.employee_id === emp.id && c.date === dateStr);
-                const prefersOpposite = isEvening ? pref?.constraint_type === 'prefer_morning' : pref?.constraint_type === 'prefer_evening';
-                if (!prefersOpposite) {
-                  return { employee: emp, index: empIndex };
-                }
-              }
-            }
-            
-            // מעבר שני: עובדים שעבר הלימיט אבל יכולים לעבוד (להתעלם מהעדפות)
-            for (let i = 0; i < employees.length; i++) {
-              const empIndex = (startIndex + i) % employees.length;
-              const emp = employees[empIndex];
-              const alreadyWorkedToday = newShifts.some(s => s.employee_id === emp.id && s.date === dateStr);
-              const workedThisShiftType = isEvening ? weeklyShifts[emp.id].evening : weeklyShifts[emp.id].morning;
-              
-              if (!workedThisShiftType && weeklyShifts[emp.id].count < 2 && !alreadyWorkedToday) {
-                return { employee: emp, index: empIndex };
-              }
-            }
-            
-            return null;
-          };
-
-          // שיבוץ משמרת בוקר type1
-          if (type1Employees.length > 0) {
-            const result = findEmployeeForShift(type1Employees, type1MorningIndex, false);
-            if (result) {
-              newShifts.push({
-                employee_id: result.employee.id,
-                date: dateStr,
-                shift_type: 'morning_type1',
-                month: monthKey,
-              });
-              weeklyShifts[result.employee.id].morning = true;
-              weeklyShifts[result.employee.id].count++;
-              type1MorningIndex = (result.index + 1) % type1Employees.length;
-            }
+          if (contract1.length > 0) {
+            newShifts.push({
+              date: dateStr,
+              shift_type: 'קצרה',
+              assigned_employee_id: contract1[shortIndex % contract1.length].id,
+              status: 'תקין',
+            });
+            shortIndex++;
           }
 
-          // שיבוץ משמרת בוקר type2
-          if (type2Employees.length > 0) {
-            const result = findEmployeeForShift(type2Employees, type2MorningIndex, false);
-            if (result) {
-              newShifts.push({
-                employee_id: result.employee.id,
-                date: dateStr,
-                shift_type: 'morning_type2',
-                month: monthKey,
-              });
-              weeklyShifts[result.employee.id].morning = true;
-              weeklyShifts[result.employee.id].count++;
-              type2MorningIndex = (result.index + 1) % type2Employees.length;
-            }
-          }
-
-          // שיבוץ משמרת ערב type1
-          if (type1Employees.length > 0) {
-            const result = findEmployeeForShift(type1Employees, type1EveningIndex, true);
-            if (result) {
-              newShifts.push({
-                employee_id: result.employee.id,
-                date: dateStr,
-                shift_type: 'evening_type1',
-                month: monthKey,
-              });
-              weeklyShifts[result.employee.id].evening = true;
-              weeklyShifts[result.employee.id].count++;
-              type1EveningIndex = (result.index + 1) % type1Employees.length;
-            }
-          }
-
-          // שיבוץ משמרת ערב type2
-          if (type2Employees.length > 0) {
-            const result = findEmployeeForShift(type2Employees, type2EveningIndex, true);
-            if (result) {
-              newShifts.push({
-                employee_id: result.employee.id,
-                date: dateStr,
-                shift_type: 'evening_type2',
-                month: monthKey,
-              });
-              weeklyShifts[result.employee.id].evening = true;
-              weeklyShifts[result.employee.id].count++;
-              type2EveningIndex = (result.index + 1) % type2Employees.length;
-            }
+          if (contract2.length > 0) {
+            newShifts.push({
+              date: dateStr,
+              shift_type: 'ארוכה',
+              assigned_employee_id: contract2[longIndex % contract2.length].id,
+              status: 'תקין',
+            });
+            longIndex++;
           }
         }
       }
 
-      // יצירת כל המשמרות
+      // יצירת משמרות
       await base44.entities.Shift.bulkCreate(newShifts);
       queryClient.invalidateQueries(['shifts']);
       
-      toast({
-        title: 'השיבוץ נוצר בהצלחה!',
-        description: `נוצרו ${newShifts.length} משמרות`,
-      });
+      toast({ title: `נוצרו ${newShifts.length} משמרות` });
     } catch (error) {
-      toast({
-        title: 'שגיאה ביצירת השיבוץ',
-        description: error.message,
-        variant: 'destructive',
-      });
+      toast({ title: 'שגיאה', description: error.message, variant: 'destructive' });
     } finally {
       setGenerating(false);
     }
   };
 
-  const handleDayClick = (date) => {
-    setSelectedDate(format(date, 'yyyy-MM-dd'));
-    setDialogOpen(true);
-  };
-
-  const handleShiftUpdate = async (shiftId, employeeId, shiftType) => {
-    if (shiftId) {
-      if (!employeeId || !shiftType) {
-        await deleteShiftMutation.mutateAsync(shiftId);
-      } else {
-        await updateShiftMutation.mutateAsync({
-          id: shiftId,
-          data: { employee_id: employeeId, shift_type: shiftType },
-        });
-      }
-    } else if (employeeId && shiftType) {
-      await createShiftMutation.mutateAsync({
-        employee_id: employeeId,
-        date: selectedDate,
-        shift_type: shiftType,
-        month: monthKey,
-      });
-    }
-    setDialogOpen(false);
-  };
-
   const renderDay = (date) => {
-    const dayOfWeek = format(date, 'i');
-    // הסתר שבת
-    if (dayOfWeek === '6') return null;
-    
-    const dayShifts = getShiftForDate(date).filter(shift => {
-      const employee = employees.find((e) => e.id === shift.employee_id);
-      return !!employee;
-    });
-    const dayNumber = format(date, 'd');
-    const isFriday = dayOfWeek === '5';
+    const dayOfWeek = getDay(date);
+    if (dayOfWeek === 6) return null;
+
     const dateStr = format(date, 'yyyy-MM-dd');
-    
-    // מציאת הערות שעות מיוחדות לאותו יום
-    const dayConstraints = constraints.filter((c) => {
-      const employee = employees.find((e) => e.id === c.employee_id);
-      return c.date === dateStr && c.special_hours && employee;
-    });
+    const dayShifts = shifts.filter(s => s.date === dateStr);
+    const dayNumber = format(date, 'd');
+    const isFriday = dayOfWeek === 5;
 
     return (
       <div
         key={date.toString()}
-        onClick={() => handleDayClick(date)}
-        className={`
-          p-2 border rounded-lg cursor-pointer transition-all hover:shadow-md min-h-[80px]
-          ${isFriday ? 'bg-blue-50 border-blue-300' : 'bg-white border-gray-200'}
-        `}
+        onClick={() => { setSelectedDate(dateStr); setDialogOpen(true); }}
+        className={`p-2 border-2 rounded-lg cursor-pointer hover:shadow-md min-h-[100px] ${isFriday ? 'bg-blue-50' : 'bg-white'}`}
       >
         <div className="font-bold text-center mb-2">{dayNumber}</div>
-        
-        {dayConstraints.length > 0 && (
-          <div className="mb-2 space-y-1">
-            {dayConstraints.map((constraint) => {
-              const employee = employees.find((e) => e.id === constraint.employee_id);
-              return (
-                <div
-                  key={constraint.id}
-                  className="text-xs bg-amber-100 text-amber-800 p-1 rounded border border-amber-300"
-                >
-                  {employee.full_name}: {constraint.special_hours}
-                </div>
-              );
-            })}
-          </div>
-        )}
-        
         <div className="space-y-1">
           {dayShifts.map((shift) => {
-            const employee = employees.find((e) => e.id === shift.employee_id);
+            const employee = employees.find(e => e.id === shift.assigned_employee_id);
+            const validation = validateShift(shift, shifts, employees);
             return (
               <div
                 key={shift.id}
-                className={`text-xs p-1 rounded ${SHIFT_COLORS[shift.shift_type]} text-center`}
+                className={`text-xs p-1 rounded border-2 ${SHIFT_COLORS[shift.shift_type]} ${STATUS_COLORS[validation.status]}`}
               >
-                {employee.full_name} - {SHIFT_LABELS[shift.shift_type]}
+                <div className="font-medium">{employee?.full_name || 'לא משובץ'}</div>
+                <div>{shift.shift_type}</div>
+                {validation.status !== 'תקין' && (
+                  <div className="text-red-600 flex items-center gap-1 mt-1">
+                    <AlertCircle className="w-3 h-3" />
+                    <span className="text-[10px]">{validation.reason}</span>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -434,35 +259,11 @@ export default function ManagerDashboard() {
     );
   };
 
-  const goToPreviousMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1));
-  };
-
-  const goToNextMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1));
-  };
-
-  const shiftsForSelectedDate = selectedDate ? getShiftForDate(new Date(selectedDate)) : [];
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-6 flex items-center justify-center" dir="rtl">
-        <div className="text-center">
-          <p className="text-lg text-gray-700">טוען...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAdmin) {
-    return null;
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-6" dir="rtl">
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
-          <h1 className="text-3xl font-bold text-gray-800">לוח משמרות - ניהול</h1>
+          <h1 className="text-3xl font-bold">לוח משמרות</h1>
           
           <div className="flex gap-3">
             <Link to={createPageUrl('ManageEmployees')}>
@@ -471,82 +272,48 @@ export default function ManagerDashboard() {
                 ניהול עובדים
               </Button>
             </Link>
-            
-            <Button onClick={generateSchedule} disabled={generating} className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
+            <Button onClick={generateSchedule} disabled={generating}>
               <Sparkles className="w-4 h-4 ml-2" />
-              {generating ? 'יוצר שיבוץ...' : 'צור שיבוץ אוטומטי'}
+              {generating ? 'יוצר...' : 'צור שיבוץ'}
             </Button>
-            
-            <Button onClick={goToPreviousMonth} variant="outline">
+            <Button onClick={() => setCurrentDate(new Date(year, month - 2))} variant="outline">
               <ChevronRight className="w-5 h-5" />
             </Button>
-            <Button onClick={goToNextMonth} variant="outline">
+            <Button onClick={() => setCurrentDate(new Date(year, month))} variant="outline">
               <ChevronLeft className="w-5 h-5" />
             </Button>
-            
-            <Button onClick={() => base44.auth.logout()} variant="outline" className="text-red-600 hover:text-red-700">
+            <Button onClick={() => base44.auth.logout()} variant="outline">
               <LogOut className="w-4 h-4 ml-2" />
               יציאה
             </Button>
           </div>
         </div>
 
-        <ShiftLegend />
-
         <MonthCalendar year={year} month={month} renderDay={renderDay} />
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContent dir="rtl">
             <DialogHeader>
-              <DialogTitle>עריכת משמרות ליום {selectedDate}</DialogTitle>
+              <DialogTitle>עריכת משמרות - {selectedDate}</DialogTitle>
             </DialogHeader>
-            
-            <div className="space-y-4 py-4">
-              {shiftsForSelectedDate.length === 0 && (
-                <p className="text-gray-500 text-center">אין משמרות ליום זה</p>
-              )}
-              
-              {shiftsForSelectedDate.map((shift) => {
-                const employee = employees.find((e) => e.id === shift.employee_id);
-                return (
-                  <div key={shift.id} className="border rounded-lg p-4 space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Edit2 className="w-4 h-4 text-gray-500" />
-                      <span className="font-medium">{employee?.full_name}</span>
-                    </div>
-                    
-                    <Select
-                      value={shift.shift_type}
-                      onValueChange={(value) => handleShiftUpdate(shift.id, shift.employee_id, value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="morning_type1">בוקר סוג 1 - 08:00-16:30</SelectItem>
-                        <SelectItem value="evening_type1">ערב סוג 1 - 10:30-19:00</SelectItem>
-                        <SelectItem value="morning_type2">בוקר סוג 2 - 08:00-17:00</SelectItem>
-                        <SelectItem value="evening_type2">ערב סוג 2 - 10:00-19:00</SelectItem>
-                        <SelectItem value="friday_a">שישי A 08:00-14:00</SelectItem>
-                        <SelectItem value="friday_b">שישי B 08:30-12:00</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleShiftUpdate(shift.id, null, null)}
-                      className="w-full"
-                    >
-                      מחק משמרת
-                    </Button>
-                  </div>
-                );
-              })}
-              
-              <Button variant="outline" onClick={() => setDialogOpen(false)} className="w-full">
-                סגור
-              </Button>
+            <div className="space-y-4">
+              {shifts.filter(s => s.date === selectedDate).map(shift => (
+                <div key={shift.id} className="border p-3 rounded">
+                  <Label>עובד: {employees.find(e => e.id === shift.assigned_employee_id)?.full_name}</Label>
+                  <div className="mt-2">סוג: {shift.shift_type}</div>
+                  <Button 
+                    variant="destructive" 
+                    size="sm" 
+                    className="mt-2"
+                    onClick={async () => {
+                      await deleteShiftMutation.mutateAsync(shift.id);
+                      setDialogOpen(false);
+                    }}
+                  >
+                    מחק
+                  </Button>
+                </div>
+              ))}
             </div>
           </DialogContent>
         </Dialog>

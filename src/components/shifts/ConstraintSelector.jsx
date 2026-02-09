@@ -53,8 +53,8 @@ export default function ConstraintSelector({ isOpen, onClose, onSelect, selected
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent dir="rtl">
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent dir="rtl" className="max-w-md">
         <DialogHeader>
           <DialogTitle>בחר אילוץ ליום {selectedDate}</DialogTitle>
         </DialogHeader>

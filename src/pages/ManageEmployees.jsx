@@ -21,10 +21,6 @@ export default function ManageEmployees() {
     full_name: '',
     active: true,
     contract_type: '08:00–17:00 / 10:00–19:00',
-    unavailable: false,
-    last_friday_date: '',
-    monthly_shifts_count: 0,
-    monthly_fridays_count: 0,
     notes: '',
   });
 
@@ -69,10 +65,6 @@ export default function ManageEmployees() {
       full_name: '',
       active: true,
       contract_type: '08:00–17:00 / 10:00–19:00',
-      unavailable: false,
-      last_friday_date: '',
-      monthly_shifts_count: 0,
-      monthly_fridays_count: 0,
       notes: '',
     });
     setEditingEmployee(null);
@@ -93,10 +85,6 @@ export default function ManageEmployees() {
       full_name: employee.full_name,
       active: employee.active,
       contract_type: employee.contract_type,
-      unavailable: employee.unavailable,
-      last_friday_date: employee.last_friday_date || '',
-      monthly_shifts_count: employee.monthly_shifts_count || 0,
-      monthly_fridays_count: employee.monthly_fridays_count || 0,
       notes: employee.notes || '',
     });
     setDialogOpen(true);
@@ -134,10 +122,7 @@ export default function ManageEmployees() {
                 <TableHead className="text-right">שם עובד</TableHead>
                 <TableHead className="text-right">פעיל</TableHead>
                 <TableHead className="text-right">סוג חוזה שעות</TableHead>
-                <TableHead className="text-right">לא זמין</TableHead>
-                <TableHead className="text-right">שישי אחרון</TableHead>
-                <TableHead className="text-right">משמרות חודש</TableHead>
-                <TableHead className="text-right">שישיים חודש</TableHead>
+                <TableHead className="text-right">הערות</TableHead>
                 <TableHead className="text-right">פעולות</TableHead>
               </TableRow>
             </TableHeader>
@@ -147,10 +132,7 @@ export default function ManageEmployees() {
                   <TableCell className="font-medium">{employee.full_name}</TableCell>
                   <TableCell>{employee.active ? '✓' : '✗'}</TableCell>
                   <TableCell>{employee.contract_type}</TableCell>
-                  <TableCell>{employee.unavailable ? '✓ לא זמין' : '-'}</TableCell>
-                  <TableCell>{employee.last_friday_date || '-'}</TableCell>
-                  <TableCell>{employee.monthly_shifts_count || 0}</TableCell>
-                  <TableCell>{employee.monthly_fridays_count || 0}</TableCell>
+                  <TableCell className="max-w-xs truncate">{employee.notes || '-'}</TableCell>
                   <TableCell>
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline" onClick={() => handleEdit(employee)}>
@@ -202,42 +184,6 @@ export default function ManageEmployees() {
                     <SelectItem value="08:00–16:30 / 10:30–19:00">08:00–16:30 / 10:30–19:00</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <Switch
-                  checked={formData.unavailable}
-                  onCheckedChange={(checked) => setFormData({ ...formData, unavailable: checked })}
-                />
-                <Label>לא זמין</Label>
-              </div>
-
-              <div>
-                <Label>תאריך שישי אחרון</Label>
-                <Input
-                  type="date"
-                  value={formData.last_friday_date}
-                  onChange={(e) => setFormData({ ...formData, last_friday_date: e.target.value })}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>כמות משמרות החודש</Label>
-                  <Input
-                    type="number"
-                    value={formData.monthly_shifts_count}
-                    onChange={(e) => setFormData({ ...formData, monthly_shifts_count: parseInt(e.target.value) || 0 })}
-                  />
-                </div>
-                <div>
-                  <Label>כמות שישיים החודש</Label>
-                  <Input
-                    type="number"
-                    value={formData.monthly_fridays_count}
-                    onChange={(e) => setFormData({ ...formData, monthly_fridays_count: parseInt(e.target.value) || 0 })}
-                  />
-                </div>
               </div>
 
               <div>

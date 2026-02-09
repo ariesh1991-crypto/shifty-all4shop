@@ -1,24 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
-import { format, getMonth, getYear, getDay, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { format, getMonth, getYear, getDay, startOfMonth, endOfMonth } from 'date-fns';
 import { ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
 import MonthCalendar from '../components/shifts/MonthCalendar';
-
-const SHIFT_COLORS = {
-  'בוקר': 'bg-blue-200',
-  'ערב': 'bg-purple-200',
-  'שישי קצר': 'bg-yellow-200',
-  'שישי ארוך': 'bg-orange-200',
-};
 
 export default function EmployeeConstraints() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [currentEmployee, setCurrentEmployee] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const year = getYear(currentDate);
   const month = getMonth(currentDate) + 1;
@@ -29,7 +29,7 @@ export default function EmployeeConstraints() {
       try {
         const user = await base44.auth.me();
         const allEmployees = await base44.entities.Employee.list();
-        const employee = allEmployees.find(emp => emp.email?.toLowerCase() === user.email.toLowerCase());
+        const employee = allEmployees.find(emp => emp.created_by?.toLowerCase() === user.email.toLowerCase());
         setCurrentEmployee(employee);
       } finally {
         setLoading(false);
@@ -38,44 +38,79 @@ export default function EmployeeConstraints() {
     loadEmployee();
   }, []);
 
-  const { data: shifts = [] } = useQuery({
-    queryKey: ['employee-shifts', currentEmployee?.id, monthKey],
+  const { data: constraints = [] } = useQuery({
+    queryKey: ['constraints', currentEmployee?.id, monthKey],
     queryFn: async () => {
       if (!currentEmployee) return [];
-      const allShifts = await base44.entities.Shift.list();
-      return allShifts.filter(s => 
-        s.assigned_employee_id === currentEmployee.id &&
-        s.date.startsWith(monthKey)
-      );
+      const all = await base44.entities.Constraint.list();
+      return all.filter(c => c.employee_id === currentEmployee.id && c.date.startsWith(monthKey));
     },
     enabled: !!currentEmployee,
   });
+
+  const createConstraintMutation = useMutation({
+    mutationFn: (data) => base44.entities.Constraint.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['constraints']);
+      toast({ title: 'אילוץ נשמר' });
+      setDialogOpen(false);
+    },
+  });
+
+  const updateConstraintMutation = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.Constraint.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['constraints']);
+      toast({ title: 'אילוץ עודכן' });
+      setDialogOpen(false);
+    },
+  });
+
+  const deleteConstraintMutation = useMutation({
+    mutationFn: (id) => base44.entities.Constraint.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['constraints']);
+      toast({ title: 'אילוץ נמחק' });
+    },
+  });
+
+  const handleSaveConstraint = (constraintData) => {
+    const existing = constraints.find(c => c.date === selectedDate);
+    if (existing) {
+      updateConstraintMutation.mutate({ id: existing.id, data: constraintData });
+    } else {
+      createConstraintMutation.mutate({ ...constraintData, employee_id: currentEmployee.id, date: selectedDate });
+    }
+  };
 
   const renderDay = (date) => {
     const dayOfWeek = getDay(date);
     if (dayOfWeek === 6) return null;
 
     const dateStr = format(date, 'yyyy-MM-dd');
-    const dayShifts = shifts.filter(s => s.date === dateStr);
+    const constraint = constraints.find(c => c.date === dateStr);
     const dayNumber = format(date, 'd');
-    const isFriday = dayOfWeek === 5;
 
     return (
       <div
         key={date.toString()}
-        className={`p-3 border rounded-lg min-h-[80px] ${isFriday ? 'bg-blue-50' : 'bg-white'}`}
+        onClick={() => { setSelectedDate(dateStr); setDialogOpen(true); }}
+        className={`p-3 border-2 rounded-lg cursor-pointer hover:shadow-md min-h-[80px] ${
+          constraint?.unavailable ? 'bg-red-100 border-red-400' :
+          constraint?.preference === 'מעדיף קצרה' ? 'bg-blue-100 border-blue-400' :
+          constraint?.preference === 'מעדיף ארוכה' ? 'bg-purple-100 border-purple-400' :
+          'bg-white'
+        }`}
       >
         <div className="font-bold text-center mb-2">{dayNumber}</div>
-        <div className="space-y-1">
-          {dayShifts.map(shift => (
-            <div
-              key={shift.id}
-              className={`text-xs p-1 rounded ${SHIFT_COLORS[shift.shift_type]} text-center font-medium`}
-            >
-              {shift.shift_type}
-            </div>
-          ))}
-        </div>
+        {constraint && (
+          <div className="text-xs text-center space-y-1">
+            {constraint.unavailable && <div className="font-bold text-red-600">לא זמין</div>}
+            {constraint.preference !== 'אין העדפה' && (
+              <div className="text-gray-700">{constraint.preference}</div>
+            )}
+          </div>
+        )}
       </div>
     );
   };
@@ -103,7 +138,7 @@ export default function EmployeeConstraints() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6" dir="rtl">
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">{currentEmployee.full_name} - המשמרות שלי</h1>
+          <h1 className="text-3xl font-bold">{currentEmployee.full_name} - אילוצים והעדפות</h1>
           <div className="flex gap-2">
             <Button onClick={() => setCurrentDate(new Date(year, month - 2))} variant="outline">
               <ChevronRight className="w-5 h-5" />
@@ -119,28 +154,77 @@ export default function EmployeeConstraints() {
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-          <h3 className="font-bold mb-2">מקרא משמרות:</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <h3 className="font-bold mb-2">מקרא:</h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded bg-blue-200 border"></div>
-              <span className="text-sm">בוקר</span>
+              <div className="w-6 h-6 rounded bg-red-100 border-2 border-red-400"></div>
+              <span className="text-sm">לא זמין</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded bg-purple-200 border"></div>
-              <span className="text-sm">ערב</span>
+              <div className="w-6 h-6 rounded bg-blue-100 border-2 border-blue-400"></div>
+              <span className="text-sm">מעדיף קצרה</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded bg-yellow-200 border"></div>
-              <span className="text-sm">שישי קצר</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded bg-orange-200 border"></div>
-              <span className="text-sm">שישי ארוך</span>
+              <div className="w-6 h-6 rounded bg-purple-100 border-2 border-purple-400"></div>
+              <span className="text-sm">מעדיף ארוכה</span>
             </div>
           </div>
         </div>
 
         <MonthCalendar year={year} month={month} renderDay={renderDay} />
+
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent dir="rtl">
+            <DialogHeader>
+              <DialogTitle>אילוצים והעדפות - {selectedDate}</DialogTitle>
+            </DialogHeader>
+            <ConstraintForm
+              selectedDate={selectedDate}
+              existingConstraint={constraints.find(c => c.date === selectedDate)}
+              onSave={handleSaveConstraint}
+              onDelete={(id) => deleteConstraintMutation.mutate(id)}
+            />
+          </DialogContent>
+        </Dialog>
+      </div>
+    </div>
+  );
+}
+
+function ConstraintForm({ selectedDate, existingConstraint, onSave, onDelete }) {
+  const [unavailable, setUnavailable] = useState(existingConstraint?.unavailable || false);
+  const [preference, setPreference] = useState(existingConstraint?.preference || 'אין העדפה');
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <Switch checked={unavailable} onCheckedChange={setUnavailable} />
+        <Label>לא זמין בתאריך זה</Label>
+      </div>
+
+      <div>
+        <Label>העדפה</Label>
+        <Select value={preference} onValueChange={setPreference}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="אין העדפה">אין העדפה</SelectItem>
+            <SelectItem value="מעדיף קצרה">מעדיף קצרה</SelectItem>
+            <SelectItem value="מעדיף ארוכה">מעדיף ארוכה</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex gap-3 justify-end">
+        {existingConstraint && (
+          <Button variant="destructive" onClick={() => onDelete(existingConstraint.id)}>
+            מחק
+          </Button>
+        )}
+        <Button onClick={() => onSave({ unavailable, preference })}>
+          שמור
+        </Button>
       </div>
     </div>
   );

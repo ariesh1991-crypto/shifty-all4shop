@@ -21,6 +21,7 @@ export default function EmployeeConstraints() {
   const [selectedDate, setSelectedDate] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [currentEmployee, setCurrentEmployee] = useState(null);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -29,10 +30,14 @@ export default function EmployeeConstraints() {
 
   useEffect(() => {
     const loadCurrentEmployee = async () => {
-      const user = await base44.auth.me();
-      const employees = await base44.entities.Employee.filter({ email: user.email });
-      if (employees.length > 0) {
-        setCurrentEmployee(employees[0]);
+      try {
+        const user = await base44.auth.me();
+        const employees = await base44.entities.Employee.filter({ email: user.email });
+        if (employees.length > 0) {
+          setCurrentEmployee(employees[0]);
+        }
+      } finally {
+        setLoading(false);
       }
     };
     loadCurrentEmployee();
@@ -142,12 +147,26 @@ export default function EmployeeConstraints() {
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1));
   };
 
-  if (!currentEmployee) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6" dir="rtl">
         <div className="max-w-6xl mx-auto">
           <div className="bg-white rounded-lg shadow-md p-8 text-center">
             <p className="text-gray-600">טוען נתוני עובד...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentEmployee) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6" dir="rtl">
+        <div className="max-w-6xl mx-auto">
+          <div className="bg-white rounded-lg shadow-md p-8 text-center">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">שגיאה</h2>
+            <p className="text-gray-600 mb-4">לא נמצא פרופיל עובד עבור המשתמש שלך.</p>
+            <p className="text-gray-500 text-sm">אנא פנה למנהל המערכת להוספתך כעובד.</p>
           </div>
         </div>
       </div>

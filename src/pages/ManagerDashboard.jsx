@@ -184,6 +184,7 @@ export default function ManagerDashboard() {
 
         if (isFriday) {
           // שיבוץ שישי - 2 עובדים (A ו-B)
+          // משמרת שישי נחשבת כמשמרת אחת, אז עובדים שעשו רק בוקר או רק ערב יכולים לעבוד
           let assignedA = false;
           let assignedB = false;
           
@@ -192,6 +193,7 @@ export default function ManagerDashboard() {
           );
 
           for (const employee of sortedByWorkload) {
+            // עובד יכול לעבוד שישי רק אם עשה פחות מ-2 משמרות
             if (weeklyShifts[employee.id].count >= 2) continue;
             
             if (!assignedA) {
@@ -226,7 +228,9 @@ export default function ManagerDashboard() {
             const empIndex = (type1MorningIndex + i) % type1Employees.length;
             const employee = type1Employees[empIndex];
             
-            if (weeklyShifts[employee.id].morning || weeklyShifts[employee.id].count >= 2) continue;
+            // בדיקה שהעובד לא עשה כבר בוקר ושלא עבר את הלימיט השבועי
+            if (weeklyShifts[employee.id].morning) continue;
+            if (weeklyShifts[employee.id].count >= 2) continue;
             
             const pref = constraints.find(c => c.employee_id === employee.id && c.date === dateStr);
             if (pref && pref.constraint_type === 'prefer_evening') continue;
@@ -249,7 +253,8 @@ export default function ManagerDashboard() {
             const empIndex = (type2MorningIndex + i) % type2Employees.length;
             const employee = type2Employees[empIndex];
             
-            if (weeklyShifts[employee.id].morning || weeklyShifts[employee.id].count >= 2) continue;
+            if (weeklyShifts[employee.id].morning) continue;
+            if (weeklyShifts[employee.id].count >= 2) continue;
             
             const pref = constraints.find(c => c.employee_id === employee.id && c.date === dateStr);
             if (pref && pref.constraint_type === 'prefer_evening') continue;
@@ -272,7 +277,8 @@ export default function ManagerDashboard() {
             const empIndex = (type1EveningIndex + i) % type1Employees.length;
             const employee = type1Employees[empIndex];
             
-            if (weeklyShifts[employee.id].evening || weeklyShifts[employee.id].count >= 2) continue;
+            if (weeklyShifts[employee.id].evening) continue;
+            if (weeklyShifts[employee.id].count >= 2) continue;
             
             const alreadyMorningToday = newShifts.some(
               s => s.employee_id === employee.id && s.date === dateStr && s.shift_type === 'morning_type1'
@@ -300,7 +306,8 @@ export default function ManagerDashboard() {
             const empIndex = (type2EveningIndex + i) % type2Employees.length;
             const employee = type2Employees[empIndex];
             
-            if (weeklyShifts[employee.id].evening || weeklyShifts[employee.id].count >= 2) continue;
+            if (weeklyShifts[employee.id].evening) continue;
+            if (weeklyShifts[employee.id].count >= 2) continue;
             
             const alreadyMorningToday = newShifts.some(
               s => s.employee_id === employee.id && s.date === dateStr && s.shift_type === 'morning_type2'

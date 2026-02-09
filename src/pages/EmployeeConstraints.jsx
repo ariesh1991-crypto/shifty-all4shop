@@ -162,12 +162,24 @@ export default function EmployeeConstraints() {
 
   if (!currentEmployee) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6" dir="rtl">
-        <div className="max-w-6xl mx-auto">
-          <div className="bg-white rounded-lg shadow-md p-8 text-center">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">שגיאה</h2>
-            <p className="text-gray-600 mb-4">לא נמצא פרופיל עובד עבור המשתמש שלך.</p>
-            <p className="text-gray-500 text-sm">אנא פנה למנהל המערכת להוספתך כעובד.</p>
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-50 p-6 flex items-center justify-center" dir="rtl">
+        <div className="max-w-md">
+          <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+            <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-3">חשבונך ממתין לאישור</h2>
+            <p className="text-gray-600 mb-4">ההרשמה שלך התקבלה בהצלחה!</p>
+            <p className="text-gray-500 text-sm mb-6">מנהל המערכת יאשר את החשבון שלך בקרוב, ואז תוכל להתחיל להגדיר אילוצים ולראות את המשמרות שלך.</p>
+            <Button 
+              onClick={() => base44.auth.logout()} 
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              <LogOut className="w-4 h-4 ml-2" />
+              יציאה
+            </Button>
           </div>
         </div>
       </div>

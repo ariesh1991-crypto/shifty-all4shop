@@ -312,13 +312,23 @@ export default function ManagerDashboard() {
   };
 
   const renderDay = (date) => {
-    const dayShifts = getShiftForDate(date);
+    const dayOfWeek = format(date, 'i');
+    // הסתר שבת
+    if (dayOfWeek === '6') return null;
+    
+    const dayShifts = getShiftForDate(date).filter(shift => {
+      const employee = employees.find((e) => e.id === shift.employee_id);
+      return !!employee;
+    });
     const dayNumber = format(date, 'd');
-    const isWeekend = format(date, 'i') === '6' || format(date, 'i') === '7';
+    const isFriday = dayOfWeek === '5';
     const dateStr = format(date, 'yyyy-MM-dd');
     
     // מציאת הערות שעות מיוחדות לאותו יום
-    const dayConstraints = constraints.filter((c) => c.date === dateStr && c.special_hours);
+    const dayConstraints = constraints.filter((c) => {
+      const employee = employees.find((e) => e.id === c.employee_id);
+      return c.date === dateStr && c.special_hours && employee;
+    });
 
     return (
       <div
@@ -326,7 +336,7 @@ export default function ManagerDashboard() {
         onClick={() => handleDayClick(date)}
         className={`
           p-2 border rounded-lg cursor-pointer transition-all hover:shadow-md min-h-[80px]
-          ${isWeekend ? 'bg-gray-100 border-blue-300' : 'bg-white border-gray-200'}
+          ${isFriday ? 'bg-blue-50 border-blue-300' : 'bg-white border-gray-200'}
         `}
       >
         <div className="font-bold text-center mb-2">{dayNumber}</div>
@@ -340,7 +350,7 @@ export default function ManagerDashboard() {
                   key={constraint.id}
                   className="text-xs bg-amber-100 text-amber-800 p-1 rounded border border-amber-300"
                 >
-                  {employee?.full_name}: {constraint.special_hours}
+                  {employee.full_name}: {constraint.special_hours}
                 </div>
               );
             })}
@@ -350,7 +360,6 @@ export default function ManagerDashboard() {
         <div className="space-y-1">
           {dayShifts.map((shift) => {
             const employee = employees.find((e) => e.id === shift.employee_id);
-            if (!employee) return null;
             return (
               <div
                 key={shift.id}

@@ -132,14 +132,21 @@ export default function ManagerDashboard() {
       const monthEnd = new Date(year, month, 0);
       const daysInMonth = monthEnd.getDate();
 
-      // מחיקת משמרות קיימות של החודש (מחיקה קבוצתית)
+      // מחיקת משמרות קיימות של החודש
       if (shifts.length > 0) {
-        const shiftIdsToDelete = shifts.map(s => s.id);
-        for (const id of shiftIdsToDelete) {
-          await deleteShiftMutation.mutateAsync(id);
+        try {
+          for (const shift of shifts) {
+            try {
+              await deleteShiftMutation.mutateAsync(shift.id);
+            } catch (err) {
+              console.log(`לא ניתן למחוק משמרת ${shift.id}:`, err);
+            }
+          }
+          // המתנה קצרה כדי לא לעבור את ה-rate limit
+          await new Promise(resolve => setTimeout(resolve, 300));
+        } catch (error) {
+          console.error('שגיאה במחיקת משמרות:', error);
         }
-        // המתנה קצרה כדי לא לעבור את ה-rate limit
-        await new Promise(resolve => setTimeout(resolve, 300));
       }
 
       const newShifts = [];

@@ -34,9 +34,10 @@ export default function ConstraintSelector({ isOpen, onClose, onSelect, selected
 
   const handleSelect = (constraintType) => {
     if (constraintType === null) {
-      onSelect(null);
       setSelectedType(null);
       setSpecialHours('');
+      onSelect(null);
+      onClose();
     } else {
       setSelectedType(constraintType);
     }
@@ -47,6 +48,7 @@ export default function ConstraintSelector({ isOpen, onClose, onSelect, selected
       onSelect(selectedType, specialHours);
       setSelectedType(null);
       setSpecialHours('');
+      onClose();
     }
   };
 

@@ -138,6 +138,12 @@ export default function ManagerDashboard() {
       }
 
       const newShifts = [];
+      
+      // מעקב אחרי משמרות שבועיות לכל עובד
+      const weeklyShifts = {};
+      employees.forEach(emp => {
+        weeklyShifts[emp.id] = [];
+      });
 
       for (let day = 1; day <= daysInMonth; day++) {
         const date = new Date(year, month - 1, day);
@@ -146,6 +152,13 @@ export default function ManagerDashboard() {
 
         // דלג על שבתות
         if (dayOfWeek === 6) continue;
+
+        // איפוס מונה שבועי בתחילת כל שבוע (יום ראשון)
+        if (dayOfWeek === 0) {
+          Object.keys(weeklyShifts).forEach(empId => {
+            weeklyShifts[empId] = [];
+          });
+        }
 
         const isFriday = dayOfWeek === 5;
 
@@ -158,109 +171,140 @@ export default function ManagerDashboard() {
         });
 
         if (isFriday) {
-          // שיבוץ שישי - לסירוגין A ו-B
-          const fridayType = Math.floor(day / 7) % 2 === 0 ? 'friday_a' : 'friday_b';
-          const employee = availableEmployees[0];
-          if (employee) {
-            newShifts.push({
-              employee_id: employee.id,
-              date: dateStr,
-              shift_type: fridayType,
-              month: monthKey,
-            });
+          // שיבוץ שישי - 2 עובדים (A ו-B)
+          let assignedFridayA = false;
+          let assignedFridayB = false;
+
+          for (const employee of availableEmployees) {
+            const empWeeklyShifts = weeklyShifts[employee.id] || [];
+            
+            // אם העובד כבר עשה 2 משמרות השבוע, דלג
+            if (empWeeklyShifts.length >= 2) continue;
+
+            if (!assignedFridayA) {
+              newShifts.push({
+                employee_id: employee.id,
+                date: dateStr,
+                shift_type: 'friday_a',
+                month: monthKey,
+              });
+              weeklyShifts[employee.id].push('friday_a');
+              assignedFridayA = true;
+            } else if (!assignedFridayB) {
+              newShifts.push({
+                employee_id: employee.id,
+                date: dateStr,
+                shift_type: 'friday_b',
+                month: monthKey,
+              });
+              weeklyShifts[employee.id].push('friday_b');
+              assignedFridayB = true;
+              break;
+            }
           }
         } else {
-          // שיבוץ ימים רגילים - שמירת מונה למחזור
+          // שיבוץ ימים רגילים
           const type1Employees = availableEmployees.filter((emp) => emp.contract_type === 'type1');
           const type2Employees = availableEmployees.filter((emp) => emp.contract_type === 'type2');
 
           // שיבוץ משמרת בוקר type1
-          if (type1Employees.length > 0) {
-            for (let i = 0; i < type1Employees.length; i++) {
-              const employee = type1Employees[(day + i) % type1Employees.length];
-              const pref = constraints.find(
-                (c) => c.employee_id === employee.id && c.date === dateStr
-              );
-              
-              if (!pref || pref.constraint_type !== 'prefer_evening') {
-                newShifts.push({
-                  employee_id: employee.id,
-                  date: dateStr,
-                  shift_type: 'morning_type1',
-                  month: monthKey,
-                });
-                break;
-              }
+          for (const employee of type1Employees) {
+            const empWeeklyShifts = weeklyShifts[employee.id] || [];
+            const hasMorning = empWeeklyShifts.some(s => s.includes('morning'));
+            
+            // אם העובד כבר עשה בוקר השבוע או כבר עשה 2 משמרות, דלג
+            if (hasMorning || empWeeklyShifts.length >= 2) continue;
+
+            const pref = constraints.find(
+              (c) => c.employee_id === employee.id && c.date === dateStr
+            );
+            
+            if (!pref || pref.constraint_type !== 'prefer_evening') {
+              newShifts.push({
+                employee_id: employee.id,
+                date: dateStr,
+                shift_type: 'morning_type1',
+                month: monthKey,
+              });
+              weeklyShifts[employee.id].push('morning_type1');
+              break;
             }
           }
 
           // שיבוץ משמרת בוקר type2
-          if (type2Employees.length > 0) {
-            for (let i = 0; i < type2Employees.length; i++) {
-              const employee = type2Employees[(day + i) % type2Employees.length];
-              const pref = constraints.find(
-                (c) => c.employee_id === employee.id && c.date === dateStr
-              );
-              
-              if (!pref || pref.constraint_type !== 'prefer_evening') {
-                newShifts.push({
-                  employee_id: employee.id,
-                  date: dateStr,
-                  shift_type: 'morning_type2',
-                  month: monthKey,
-                });
-                break;
-              }
+          for (const employee of type2Employees) {
+            const empWeeklyShifts = weeklyShifts[employee.id] || [];
+            const hasMorning = empWeeklyShifts.some(s => s.includes('morning'));
+            
+            if (hasMorning || empWeeklyShifts.length >= 2) continue;
+
+            const pref = constraints.find(
+              (c) => c.employee_id === employee.id && c.date === dateStr
+            );
+            
+            if (!pref || pref.constraint_type !== 'prefer_evening') {
+              newShifts.push({
+                employee_id: employee.id,
+                date: dateStr,
+                shift_type: 'morning_type2',
+                month: monthKey,
+              });
+              weeklyShifts[employee.id].push('morning_type2');
+              break;
             }
           }
 
           // שיבוץ משמרת ערב type1
-          if (type1Employees.length > 0) {
-            for (let i = 0; i < type1Employees.length; i++) {
-              const employee = type1Employees[(day + i + 1) % type1Employees.length];
-              const pref = constraints.find(
-                (c) => c.employee_id === employee.id && c.date === dateStr
-              );
-              
-              // בדיקה שהעובד לא כבר במשמרת בוקר באותו יום
-              const alreadyMorning = newShifts.some(
-                s => s.employee_id === employee.id && s.date === dateStr && s.shift_type === 'morning_type1'
-              );
-              
-              if (!alreadyMorning && (!pref || pref.constraint_type !== 'prefer_morning')) {
-                newShifts.push({
-                  employee_id: employee.id,
-                  date: dateStr,
-                  shift_type: 'evening_type1',
-                  month: monthKey,
-                });
-                break;
-              }
+          for (const employee of type1Employees) {
+            const empWeeklyShifts = weeklyShifts[employee.id] || [];
+            const hasEvening = empWeeklyShifts.some(s => s.includes('evening'));
+            
+            if (hasEvening || empWeeklyShifts.length >= 2) continue;
+
+            const pref = constraints.find(
+              (c) => c.employee_id === employee.id && c.date === dateStr
+            );
+            
+            const alreadyMorning = newShifts.some(
+              s => s.employee_id === employee.id && s.date === dateStr && s.shift_type === 'morning_type1'
+            );
+            
+            if (!alreadyMorning && (!pref || pref.constraint_type !== 'prefer_morning')) {
+              newShifts.push({
+                employee_id: employee.id,
+                date: dateStr,
+                shift_type: 'evening_type1',
+                month: monthKey,
+              });
+              weeklyShifts[employee.id].push('evening_type1');
+              break;
             }
           }
 
           // שיבוץ משמרת ערב type2
-          if (type2Employees.length > 0) {
-            for (let i = 0; i < type2Employees.length; i++) {
-              const employee = type2Employees[(day + i + 1) % type2Employees.length];
-              const pref = constraints.find(
-                (c) => c.employee_id === employee.id && c.date === dateStr
-              );
-              
-              // בדיקה שהעובד לא כבר במשמרת בוקר באותו יום
-              const alreadyMorning = newShifts.some(
-                s => s.employee_id === employee.id && s.date === dateStr && s.shift_type === 'morning_type2'
-              );
-              
-              if (!alreadyMorning && (!pref || pref.constraint_type !== 'prefer_morning')) {
-                newShifts.push({
-                  employee_id: employee.id,
-                  date: dateStr,
-                  shift_type: 'evening_type2',
-                  month: monthKey,
-                });
-                break;
-              }
+          for (const employee of type2Employees) {
+            const empWeeklyShifts = weeklyShifts[employee.id] || [];
+            const hasEvening = empWeeklyShifts.some(s => s.includes('evening'));
+            
+            if (hasEvening || empWeeklyShifts.length >= 2) continue;
+
+            const pref = constraints.find(
+              (c) => c.employee_id === employee.id && c.date === dateStr
+            );
+            
+            const alreadyMorning = newShifts.some(
+              s => s.employee_id === employee.id && s.date === dateStr && s.shift_type === 'morning_type2'
+            );
+            
+            if (!alreadyMorning && (!pref || pref.constraint_type !== 'prefer_morning')) {
+              newShifts.push({
+                employee_id: employee.id,
+                date: dateStr,
+                shift_type: 'evening_type2',
+                month: monthKey,
+              });
+              weeklyShifts[employee.id].push('evening_type2');
+              break;
             }
           }
         }

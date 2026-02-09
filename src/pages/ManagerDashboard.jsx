@@ -9,6 +9,7 @@ import ShiftLegend from '../components/shifts/ShiftLegend';
 import { useToast } from '@/components/ui/use-toast';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
+import React from 'react';
 import {
   Select,
   SelectContent,
@@ -46,8 +47,38 @@ export default function ManagerDashboard() {
   const [selectedDate, setSelectedDate] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // בדיקת הרשאות מנהל
+  React.useEffect(() => {
+    const checkAdmin = async () => {
+      try {
+        const user = await base44.auth.me();
+        if (user.role !== 'admin') {
+          toast({
+            title: 'אין הרשאה',
+            description: 'רק מנהלים יכולים לגשת לדף זה',
+            variant: 'destructive',
+          });
+          window.location.href = createPageUrl('EmployeeConstraints');
+          return;
+        }
+        setIsAdmin(true);
+      } catch (error) {
+        toast({
+          title: 'שגיאה',
+          description: 'לא ניתן לאמת הרשאות',
+          variant: 'destructive',
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    checkAdmin();
+  }, [toast]);
 
   const year = getYear(currentDate);
   const month = getMonth(currentDate) + 1;
@@ -298,6 +329,20 @@ export default function ManagerDashboard() {
   };
 
   const shiftsForSelectedDate = selectedDate ? getShiftForDate(new Date(selectedDate)) : [];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-6 flex items-center justify-center" dir="rtl">
+        <div className="text-center">
+          <p className="text-lg text-gray-700">טוען...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-6" dir="rtl">

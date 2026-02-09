@@ -50,12 +50,14 @@
 import EmployeeConstraints from './pages/EmployeeConstraints';
 import ManagerDashboard from './pages/ManagerDashboard';
 import ManageEmployees from './pages/ManageEmployees';
+import Home from './pages/Home';
 
 
 export const PAGES = {
     "EmployeeConstraints": EmployeeConstraints,
     "ManagerDashboard": ManagerDashboard,
     "ManageEmployees": ManageEmployees,
+    "Home": Home,
 }
 
 export const pagesConfig = {

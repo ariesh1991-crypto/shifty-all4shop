@@ -139,7 +139,7 @@ export default function ManagerDashboard() {
           await deleteShiftMutation.mutateAsync(id);
         }
         // המתנה קצרה כדי לא לעבור את ה-rate limit
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 300));
       }
 
       const newShifts = [];

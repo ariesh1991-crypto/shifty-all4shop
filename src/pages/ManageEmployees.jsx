@@ -238,7 +238,7 @@ export default function ManageEmployees() {
           </Table>
         </div>
 
-        <Dialog open={dialogOpen} onOpenChange={(open) => !open && resetForm()}>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContent dir="rtl">
             <DialogHeader>
               <DialogTitle>

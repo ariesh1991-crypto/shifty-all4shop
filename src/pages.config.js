@@ -48,16 +48,16 @@
  * The mainPage value must match a key in the PAGES object exactly.
  */
 import EmployeeConstraints from './pages/EmployeeConstraints';
-import ManagerDashboard from './pages/ManagerDashboard';
-import ManageEmployees from './pages/ManageEmployees';
 import Home from './pages/Home';
+import ManageEmployees from './pages/ManageEmployees';
+import ManagerDashboard from './pages/ManagerDashboard';
 
 
 export const PAGES = {
     "EmployeeConstraints": EmployeeConstraints,
-    "ManagerDashboard": ManagerDashboard,
-    "ManageEmployees": ManageEmployees,
     "Home": Home,
+    "ManageEmployees": ManageEmployees,
+    "ManagerDashboard": ManagerDashboard,
 }
 
 export const pagesConfig = {

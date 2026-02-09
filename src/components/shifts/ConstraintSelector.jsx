@@ -15,6 +15,7 @@ const CONSTRAINT_OPTIONS = [
   { value: 'unavailable', label: 'לא זמין', color: 'bg-red-500' },
   { value: 'prefer_morning', label: 'מעדיף בוקר', color: 'bg-blue-500' },
   { value: 'prefer_evening', label: 'מעדיף ערב', color: 'bg-purple-500' },
+  { value: 'special_hours_only', label: 'הערת שעות בלבד', color: 'bg-amber-500' },
 ];
 
 export default function ConstraintSelector({ isOpen, onClose, onSelect, selectedDate, currentConstraint }) {
@@ -59,7 +60,9 @@ export default function ConstraintSelector({ isOpen, onClose, onSelect, selected
           
           {selectedType && (
             <div className="space-y-2 pt-2">
-              <Label htmlFor="special-hours">שעות מיוחדות (אופציונלי)</Label>
+              <Label htmlFor="special-hours">
+                {selectedType === 'special_hours_only' ? 'הערת שעות (חובה)' : 'שעות מיוחדות (אופציונלי)'}
+              </Label>
               <Input
                 id="special-hours"
                 placeholder='למשל: "מגיע ב-09:00" או "עד 15:30"'
@@ -74,6 +77,7 @@ export default function ConstraintSelector({ isOpen, onClose, onSelect, selected
             <Button
               onClick={handleSave}
               className="w-full bg-green-600 hover:bg-green-700 text-white"
+              disabled={selectedType === 'special_hours_only' && !specialHours.trim()}
             >
               שמור אילוץ
             </Button>

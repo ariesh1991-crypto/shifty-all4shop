@@ -13,6 +13,7 @@ const CONSTRAINT_COLORS = {
   unavailable: 'bg-red-500 text-white',
   prefer_morning: 'bg-blue-500 text-white',
   prefer_evening: 'bg-purple-500 text-white',
+  special_hours_only: 'bg-amber-500 text-white',
 };
 
 export default function EmployeeConstraints() {
@@ -123,7 +124,12 @@ export default function EmployeeConstraints() {
           ${isWeekend ? 'border-blue-300' : 'border-gray-200'}
         `}
       >
-        <div className="font-bold text-center">{dayNumber}</div>
+        <div className="font-bold text-center mb-1">{dayNumber}</div>
+        {constraint?.special_hours && (
+          <div className="text-xs text-center mt-1 font-medium">
+            {constraint.special_hours}
+          </div>
+        )}
       </div>
     );
   };

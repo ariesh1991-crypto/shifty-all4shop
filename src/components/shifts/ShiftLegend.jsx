@@ -13,6 +13,7 @@ const CONSTRAINT_TYPES = [
   { type: 'unavailable', label: 'לא זמין', color: 'bg-red-500 text-white' },
   { type: 'prefer_morning', label: 'מעדיף בוקר', color: 'bg-blue-500 text-white' },
   { type: 'prefer_evening', label: 'מעדיף ערב', color: 'bg-purple-500 text-white' },
+  { type: 'special_hours_only', label: 'הערת שעות', color: 'bg-amber-500 text-white' },
 ];
 
 export default function ShiftLegend({ showConstraints = false }) {

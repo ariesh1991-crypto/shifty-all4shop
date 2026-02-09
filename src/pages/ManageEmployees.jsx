@@ -20,7 +20,7 @@ export default function ManageEmployees() {
   const [formData, setFormData] = useState({
     full_name: '',
     active: true,
-    contract_type: 'חוזה 1',
+    contract_type: '08:00–17:00 / 10:00–19:00',
     unavailable: false,
     last_friday_date: '',
     monthly_shifts_count: 0,
@@ -68,7 +68,7 @@ export default function ManageEmployees() {
     setFormData({
       full_name: '',
       active: true,
-      contract_type: 'חוזה 1',
+      contract_type: '08:00–17:00 / 10:00–19:00',
       unavailable: false,
       last_friday_date: '',
       monthly_shifts_count: 0,
@@ -133,7 +133,7 @@ export default function ManageEmployees() {
               <TableRow>
                 <TableHead className="text-right">שם עובד</TableHead>
                 <TableHead className="text-right">פעיל</TableHead>
-                <TableHead className="text-right">חוזה</TableHead>
+                <TableHead className="text-right">סוג חוזה שעות</TableHead>
                 <TableHead className="text-right">לא זמין</TableHead>
                 <TableHead className="text-right">שישי אחרון</TableHead>
                 <TableHead className="text-right">משמרות חודש</TableHead>
@@ -192,14 +192,14 @@ export default function ManageEmployees() {
               </div>
 
               <div>
-                <Label>סוג חוזה</Label>
+                <Label>סוג חוזה שעות</Label>
                 <Select value={formData.contract_type} onValueChange={(value) => setFormData({ ...formData, contract_type: value })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="חוזה 1">חוזה 1</SelectItem>
-                    <SelectItem value="חוזה 2">חוזה 2</SelectItem>
+                    <SelectItem value="08:00–17:00 / 10:00–19:00">08:00–17:00 / 10:00–19:00</SelectItem>
+                    <SelectItem value="08:00–16:30 / 10:30–19:00">08:00–16:30 / 10:30–19:00</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

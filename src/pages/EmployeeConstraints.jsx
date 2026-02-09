@@ -8,8 +8,8 @@ import { useToast } from '@/components/ui/use-toast';
 import MonthCalendar from '../components/shifts/MonthCalendar';
 
 const SHIFT_COLORS = {
-  'קצרה': 'bg-blue-200',
-  'ארוכה': 'bg-purple-200',
+  'בוקר': 'bg-blue-200',
+  'ערב': 'bg-purple-200',
   'שישי קצר': 'bg-yellow-200',
   'שישי ארוך': 'bg-orange-200',
 };
@@ -123,11 +123,11 @@ export default function EmployeeConstraints() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded bg-blue-200 border"></div>
-              <span className="text-sm">קצרה</span>
+              <span className="text-sm">בוקר</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded bg-purple-200 border"></div>
-              <span className="text-sm">ארוכה</span>
+              <span className="text-sm">ערב</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded bg-yellow-200 border"></div>

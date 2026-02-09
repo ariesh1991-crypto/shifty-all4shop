@@ -15,8 +15,8 @@ import MonthCalendar from '../components/shifts/MonthCalendar';
 import { he } from 'date-fns/locale';
 
 const SHIFT_COLORS = {
-  'קצרה': 'bg-blue-200',
-  'ארוכה': 'bg-purple-200',
+  'בוקר': 'bg-blue-200',
+  'ערב': 'bg-purple-200',
   'שישי קצר': 'bg-yellow-200',
   'שישי ארוך': 'bg-orange-200',
 };
@@ -100,17 +100,17 @@ export default function ManagerDashboard() {
       return { status: 'בעיה', reason: 'חריגה מ-2 משמרות בשבוע' };
     }
 
-    // כלל 4: חמישי ארוכה → אין שישי למחרת
+    // כלל 4: חמישי ערב → אין שישי למחרת
     const dayOfWeek = getDay(shiftDate);
     if (dayOfWeek === 5 && shift.shift_type.includes('שישי')) {
       const yesterday = format(new Date(shiftDate.getTime() - 86400000), 'yyyy-MM-dd');
-      const thursdayLong = allShifts.find(s => 
+      const thursdayEvening = allShifts.find(s => 
         s.date === yesterday && 
         s.assigned_employee_id === employee.id && 
-        s.shift_type === 'ארוכה'
+        s.shift_type === 'ערב'
       );
-      if (thursdayLong) {
-        return { status: 'בעיה', reason: 'עשה חמישי ארוכה אתמול' };
+      if (thursdayEvening) {
+        return { status: 'בעיה', reason: 'עשה חמישי ערב אתמול' };
       }
     }
 
@@ -153,8 +153,8 @@ export default function ManagerDashboard() {
       const newShifts = [];
       const activeEmployees = employees.filter(e => e.active && !e.unavailable);
       
-      let shortIndex = 0;
-      let longIndex = 0;
+      let morningIndex = 0;
+      let eveningIndex = 0;
 
       for (const day of days) {
         const dayOfWeek = getDay(day);
@@ -180,28 +180,23 @@ export default function ManagerDashboard() {
             });
           }
         } else {
-          // יום רגיל - משמרת קצרה וארוכה
-          const contract1 = activeEmployees.filter(e => e.contract_type === 'חוזה 1');
-          const contract2 = activeEmployees.filter(e => e.contract_type === 'חוזה 2');
-
-          if (contract1.length > 0) {
+          // יום רגיל - בוקר וערב
+          if (activeEmployees.length > 0) {
             newShifts.push({
               date: dateStr,
-              shift_type: 'קצרה',
-              assigned_employee_id: contract1[shortIndex % contract1.length].id,
+              shift_type: 'בוקר',
+              assigned_employee_id: activeEmployees[morningIndex % activeEmployees.length].id,
               status: 'תקין',
             });
-            shortIndex++;
-          }
-
-          if (contract2.length > 0) {
+            morningIndex++;
+            
             newShifts.push({
               date: dateStr,
-              shift_type: 'ארוכה',
-              assigned_employee_id: contract2[longIndex % contract2.length].id,
+              shift_type: 'ערב',
+              assigned_employee_id: activeEmployees[eveningIndex % activeEmployees.length].id,
               status: 'תקין',
             });
-            longIndex++;
+            eveningIndex++;
           }
         }
       }

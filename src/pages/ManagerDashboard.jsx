@@ -9,7 +9,6 @@ import ShiftLegend from '../components/shifts/ShiftLegend';
 import { useToast } from '@/components/ui/use-toast';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
-import React from 'react';
 import {
   Select,
   SelectContent,

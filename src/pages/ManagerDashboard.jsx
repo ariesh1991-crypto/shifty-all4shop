@@ -25,16 +25,16 @@ import {
 
 const SHIFT_COLORS = {
   morning: 'bg-blue-200',
-  evening: 'bg-purple-200',
-  special: 'bg-green-200',
+  evening_type1: 'bg-purple-200',
+  evening_type2: 'bg-green-200',
   friday_a: 'bg-yellow-200',
   friday_b: 'bg-orange-200',
 };
 
 const SHIFT_LABELS = {
   morning: 'בוקר',
-  evening: 'ערב',
-  special: 'מיוחד',
+  evening_type1: 'ערב סוג 1',
+  evening_type2: 'ערב סוג 2',
   friday_a: 'שישי A',
   friday_b: 'שישי B',
 };
@@ -119,8 +119,6 @@ export default function ManagerDashboard() {
 
         // עובדים זמינים לאותו יום
         const availableEmployees = employees.filter((emp) => {
-          if (emp.contract_type === 'regular') return false;
-          
           const hasUnavailableConstraint = constraints.some(
             (c) => c.employee_id === emp.id && c.date === dateStr && c.constraint_type === 'unavailable'
           );
@@ -145,16 +143,20 @@ export default function ManagerDashboard() {
             const pref = constraints.find(
               (c) => c.employee_id === emp.id && c.date === dateStr
             );
-            return emp.contract_type === 'morning' || emp.contract_type === 'special' || 
+            return emp.contract_type === 'morning' || 
                    (pref && pref.constraint_type === 'prefer_morning');
           });
 
-          const eveningEmployees = availableEmployees.filter((emp) => {
+          const eveningType1Employees = availableEmployees.filter((emp) => {
             const pref = constraints.find(
               (c) => c.employee_id === emp.id && c.date === dateStr
             );
-            return emp.contract_type === 'evening' || emp.contract_type === 'special' || 
+            return emp.contract_type === 'evening_type1' || 
                    (pref && pref.constraint_type === 'prefer_evening');
+          });
+
+          const eveningType2Employees = availableEmployees.filter((emp) => {
+            return emp.contract_type === 'evening_type2';
           });
 
           if (morningEmployees.length > 0) {
@@ -162,17 +164,27 @@ export default function ManagerDashboard() {
             newShifts.push({
               employee_id: employee.id,
               date: dateStr,
-              shift_type: employee.contract_type === 'special' ? 'special' : 'morning',
+              shift_type: 'morning',
               month: monthKey,
             });
           }
 
-          if (eveningEmployees.length > 0) {
-            const employee = eveningEmployees[(day + 1) % eveningEmployees.length];
+          if (eveningType1Employees.length > 0) {
+            const employee = eveningType1Employees[day % eveningType1Employees.length];
             newShifts.push({
               employee_id: employee.id,
               date: dateStr,
-              shift_type: employee.contract_type === 'special' ? 'special' : 'evening',
+              shift_type: 'evening_type1',
+              month: monthKey,
+            });
+          }
+
+          if (eveningType2Employees.length > 0) {
+            const employee = eveningType2Employees[day % eveningType2Employees.length];
+            newShifts.push({
+              employee_id: employee.id,
+              date: dateStr,
+              shift_type: 'evening_type2',
               month: monthKey,
             });
           }
@@ -327,8 +339,8 @@ export default function ManagerDashboard() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="morning">בוקר 08:00-17:30</SelectItem>
-                        <SelectItem value="evening">ערב 10:30-19:00</SelectItem>
-                        <SelectItem value="special">מיוחד 10:00-19:00</SelectItem>
+                        <SelectItem value="evening_type1">ערב סוג 1 - 10:30-19:00</SelectItem>
+                        <SelectItem value="evening_type2">ערב סוג 2 - 10:00-19:00</SelectItem>
                         <SelectItem value="friday_a">שישי A 08:00-14:00</SelectItem>
                         <SelectItem value="friday_b">שישי B 08:30-12:00</SelectItem>
                       </SelectContent>

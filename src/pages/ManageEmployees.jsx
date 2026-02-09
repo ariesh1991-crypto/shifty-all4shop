@@ -33,10 +33,9 @@ import { createPageUrl } from '../utils';
 import { ArrowRight } from 'lucide-react';
 
 const CONTRACT_TYPES = {
-  regular: 'רגיל (08:00-16:30)',
   morning: 'בוקר (08:00-17:30)',
-  evening: 'ערב (10:30-19:00)',
-  special: 'מיוחד (10:00-19:00)',
+  evening_type1: 'ערב סוג 1 (10:30-19:00)',
+  evening_type2: 'ערב סוג 2 (10:00-19:00)',
 };
 
 export default function ManageEmployees() {
@@ -44,7 +43,8 @@ export default function ManageEmployees() {
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [formData, setFormData] = useState({
     full_name: '',
-    contract_type: 'regular',
+    email: '',
+    contract_type: 'morning',
   });
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -81,7 +81,7 @@ export default function ManageEmployees() {
   });
 
   const resetForm = () => {
-    setFormData({ full_name: '', contract_type: 'regular' });
+    setFormData({ full_name: '', email: '', contract_type: 'morning' });
     setEditingEmployee(null);
     setDialogOpen(false);
   };
@@ -96,6 +96,17 @@ export default function ManageEmployees() {
       });
     } else {
       await createEmployeeMutation.mutateAsync(formData);
+      // הזמנת המשתמש למערכת
+      try {
+        await base44.users.inviteUser(formData.email, 'user');
+        toast({ title: 'העובד נוסף והוזמן למערכת בהצלחה' });
+      } catch (error) {
+        toast({ 
+          title: 'העובד נוסף אבל לא ניתן היה להזמין למערכת', 
+          description: error.message,
+          variant: 'destructive' 
+        });
+      }
     }
   };
 
@@ -103,6 +114,7 @@ export default function ManageEmployees() {
     setEditingEmployee(employee);
     setFormData({
       full_name: employee.full_name,
+      email: employee.email,
       contract_type: employee.contract_type,
     });
     setDialogOpen(true);
@@ -138,6 +150,7 @@ export default function ManageEmployees() {
             <TableHeader>
               <TableRow>
                 <TableHead className="text-right">שם עובד</TableHead>
+                <TableHead className="text-right">אימייל</TableHead>
                 <TableHead className="text-right">סוג חוזה</TableHead>
                 <TableHead className="text-right">פעולות</TableHead>
               </TableRow>
@@ -145,7 +158,7 @@ export default function ManageEmployees() {
             <TableBody>
               {employees.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center text-gray-500 py-8">
+                  <TableCell colSpan={4} className="text-center text-gray-500 py-8">
                     אין עובדים במערכת. הוסף עובד ראשון!
                   </TableCell>
                 </TableRow>
@@ -153,6 +166,7 @@ export default function ManageEmployees() {
                 employees.map((employee) => (
                   <TableRow key={employee.id}>
                     <TableCell className="font-medium">{employee.full_name}</TableCell>
+                    <TableCell className="text-gray-600">{employee.email}</TableCell>
                     <TableCell>{CONTRACT_TYPES[employee.contract_type]}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
@@ -201,6 +215,22 @@ export default function ManageEmployees() {
               </div>
               
               <div className="space-y-2">
+                <Label htmlFor="email">אימייל</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="example@all4shop.co.il"
+                  required
+                  disabled={!!editingEmployee}
+                />
+                {!editingEmployee && (
+                  <p className="text-xs text-gray-500">העובד יקבל הזמנה למערכת באימייל זה</p>
+                )}
+              </div>
+              
+              <div className="space-y-2">
                 <Label htmlFor="contract_type">סוג חוזה</Label>
                 <Select
                   value={formData.contract_type}
@@ -210,10 +240,9 @@ export default function ManageEmployees() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="regular">רגיל (08:00-16:30)</SelectItem>
                     <SelectItem value="morning">בוקר (08:00-17:30)</SelectItem>
-                    <SelectItem value="evening">ערב (10:30-19:00)</SelectItem>
-                    <SelectItem value="special">מיוחד (10:00-19:00)</SelectItem>
+                    <SelectItem value="evening_type1">ערב סוג 1 (10:30-19:00)</SelectItem>
+                    <SelectItem value="evening_type2">ערב סוג 2 (10:00-19:00)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

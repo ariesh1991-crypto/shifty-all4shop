@@ -29,7 +29,7 @@ export default function EmployeeConstraints() {
   useEffect(() => {
     const loadCurrentEmployee = async () => {
       const user = await base44.auth.me();
-      const employees = await base44.entities.Employee.filter({ created_by: user.email });
+      const employees = await base44.entities.Employee.filter({ email: user.email });
       if (employees.length > 0) {
         setCurrentEmployee(employees[0]);
       }

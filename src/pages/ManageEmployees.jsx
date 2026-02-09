@@ -33,9 +33,8 @@ import { createPageUrl } from '../utils';
 import { ArrowRight } from 'lucide-react';
 
 const CONTRACT_TYPES = {
-  morning: 'בוקר (08:00-17:30)',
-  evening_type1: 'ערב סוג 1 (10:30-19:00)',
-  evening_type2: 'ערב סוג 2 (10:00-19:00)',
+  type1: 'חוזה סוג 1 (08:00-16:30 או 10:30-19:00)',
+  type2: 'חוזה סוג 2 (08:00-17:00 או 10:00-19:00)',
 };
 
 export default function ManageEmployees() {
@@ -44,7 +43,7 @@ export default function ManageEmployees() {
   const [formData, setFormData] = useState({
     full_name: '',
     email: '',
-    contract_type: 'morning',
+    contract_type: 'type1',
   });
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -81,7 +80,7 @@ export default function ManageEmployees() {
   });
 
   const resetForm = () => {
-    setFormData({ full_name: '', email: '', contract_type: 'morning' });
+    setFormData({ full_name: '', email: '', contract_type: 'type1' });
     setEditingEmployee(null);
     setDialogOpen(false);
   };
@@ -240,9 +239,8 @@ export default function ManageEmployees() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="morning">בוקר (08:00-17:30)</SelectItem>
-                    <SelectItem value="evening_type1">ערב סוג 1 (10:30-19:00)</SelectItem>
-                    <SelectItem value="evening_type2">ערב סוג 2 (10:00-19:00)</SelectItem>
+                    <SelectItem value="type1">חוזה סוג 1 (08:00-16:30 או 10:30-19:00)</SelectItem>
+                    <SelectItem value="type2">חוזה סוג 2 (08:00-17:00 או 10:00-19:00)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

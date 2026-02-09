@@ -22,6 +22,16 @@ export default function ConstraintSelector({ isOpen, onClose, onSelect, selected
   const [selectedType, setSelectedType] = useState(currentConstraint?.constraint_type || null);
   const [specialHours, setSpecialHours] = useState(currentConstraint?.special_hours || '');
 
+  React.useEffect(() => {
+    if (currentConstraint) {
+      setSelectedType(currentConstraint.constraint_type);
+      setSpecialHours(currentConstraint.special_hours || '');
+    } else {
+      setSelectedType(null);
+      setSpecialHours('');
+    }
+  }, [currentConstraint, selectedDate, isOpen]);
+
   const handleSelect = (constraintType) => {
     if (constraintType === null) {
       onSelect(null);
@@ -76,10 +86,10 @@ export default function ConstraintSelector({ isOpen, onClose, onSelect, selected
           {selectedType && (
             <Button
               onClick={handleSave}
-              className="w-full bg-green-600 hover:bg-green-700 text-white"
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold"
               disabled={selectedType === 'special_hours_only' && !specialHours.trim()}
             >
-              שמור אילוץ
+              ✓ אשר ושמור
             </Button>
           )}
           

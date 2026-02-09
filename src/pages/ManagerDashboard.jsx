@@ -227,111 +227,100 @@ export default function ManagerDashboard() {
           const type1Employees = availableEmployees.filter((emp) => emp.contract_type === 'type1');
           const type2Employees = availableEmployees.filter((emp) => emp.contract_type === 'type2');
 
-          // שיבוץ משמרת בוקר type1
-          if (type1Employees.length > 0) {
-            let assigned = false;
-            for (let i = 0; i < type1Employees.length && !assigned; i++) {
-              const empIndex = (type1MorningIndex + i) % type1Employees.length;
-              const employee = type1Employees[empIndex];
+          // פונקציה למציאת עובד למשמרת
+          const findEmployeeForShift = (employees, startIndex, isEvening = false) => {
+            // מעבר ראשון: עובדים שמתאימים לחלוטין (העדפות + לא עבר הלימיט)
+            for (let i = 0; i < employees.length; i++) {
+              const empIndex = (startIndex + i) % employees.length;
+              const emp = employees[empIndex];
+              const alreadyWorkedToday = newShifts.some(s => s.employee_id === emp.id && s.date === dateStr);
+              const workedThisShiftType = isEvening ? weeklyShifts[emp.id].evening : weeklyShifts[emp.id].morning;
               
-              if (!weeklyShifts[employee.id].morning && weeklyShifts[employee.id].count < 2) {
-                const pref = constraints.find(c => c.employee_id === employee.id && c.date === dateStr);
-                if (!pref || pref.constraint_type !== 'prefer_evening') {
-                  newShifts.push({
-                    employee_id: employee.id,
-                    date: dateStr,
-                    shift_type: 'morning_type1',
-                    month: monthKey,
-                  });
-                  weeklyShifts[employee.id].morning = true;
-                  weeklyShifts[employee.id].count++;
-                  type1MorningIndex = (empIndex + 1) % type1Employees.length;
-                  assigned = true;
+              if (!workedThisShiftType && weeklyShifts[emp.id].count < 2 && !alreadyWorkedToday) {
+                const pref = constraints.find(c => c.employee_id === emp.id && c.date === dateStr);
+                const prefersOpposite = isEvening ? pref?.constraint_type === 'prefer_morning' : pref?.constraint_type === 'prefer_evening';
+                if (!prefersOpposite) {
+                  return { employee: emp, index: empIndex };
                 }
               }
+            }
+            
+            // מעבר שני: עובדים שעבר הלימיט אבל יכולים לעבוד (להתעלם מהעדפות)
+            for (let i = 0; i < employees.length; i++) {
+              const empIndex = (startIndex + i) % employees.length;
+              const emp = employees[empIndex];
+              const alreadyWorkedToday = newShifts.some(s => s.employee_id === emp.id && s.date === dateStr);
+              const workedThisShiftType = isEvening ? weeklyShifts[emp.id].evening : weeklyShifts[emp.id].morning;
+              
+              if (!workedThisShiftType && weeklyShifts[emp.id].count < 2 && !alreadyWorkedToday) {
+                return { employee: emp, index: empIndex };
+              }
+            }
+            
+            return null;
+          };
+
+          // שיבוץ משמרת בוקר type1
+          if (type1Employees.length > 0) {
+            const result = findEmployeeForShift(type1Employees, type1MorningIndex, false);
+            if (result) {
+              newShifts.push({
+                employee_id: result.employee.id,
+                date: dateStr,
+                shift_type: 'morning_type1',
+                month: monthKey,
+              });
+              weeklyShifts[result.employee.id].morning = true;
+              weeklyShifts[result.employee.id].count++;
+              type1MorningIndex = (result.index + 1) % type1Employees.length;
             }
           }
 
           // שיבוץ משמרת בוקר type2
           if (type2Employees.length > 0) {
-            let assigned = false;
-            for (let i = 0; i < type2Employees.length && !assigned; i++) {
-              const empIndex = (type2MorningIndex + i) % type2Employees.length;
-              const employee = type2Employees[empIndex];
-              
-              if (!weeklyShifts[employee.id].morning && weeklyShifts[employee.id].count < 2) {
-                const pref = constraints.find(c => c.employee_id === employee.id && c.date === dateStr);
-                if (!pref || pref.constraint_type !== 'prefer_evening') {
-                  newShifts.push({
-                    employee_id: employee.id,
-                    date: dateStr,
-                    shift_type: 'morning_type2',
-                    month: monthKey,
-                  });
-                  weeklyShifts[employee.id].morning = true;
-                  weeklyShifts[employee.id].count++;
-                  type2MorningIndex = (empIndex + 1) % type2Employees.length;
-                  assigned = true;
-                }
-              }
+            const result = findEmployeeForShift(type2Employees, type2MorningIndex, false);
+            if (result) {
+              newShifts.push({
+                employee_id: result.employee.id,
+                date: dateStr,
+                shift_type: 'morning_type2',
+                month: monthKey,
+              });
+              weeklyShifts[result.employee.id].morning = true;
+              weeklyShifts[result.employee.id].count++;
+              type2MorningIndex = (result.index + 1) % type2Employees.length;
             }
           }
 
           // שיבוץ משמרת ערב type1
           if (type1Employees.length > 0) {
-            let assigned = false;
-            for (let i = 0; i < type1Employees.length && !assigned; i++) {
-              const empIndex = (type1EveningIndex + i) % type1Employees.length;
-              const employee = type1Employees[empIndex];
-              
-              const alreadyMorningToday = newShifts.some(
-                s => s.employee_id === employee.id && s.date === dateStr
-              );
-              
-              if (!weeklyShifts[employee.id].evening && weeklyShifts[employee.id].count < 2 && !alreadyMorningToday) {
-                const pref = constraints.find(c => c.employee_id === employee.id && c.date === dateStr);
-                if (!pref || pref.constraint_type !== 'prefer_morning') {
-                  newShifts.push({
-                    employee_id: employee.id,
-                    date: dateStr,
-                    shift_type: 'evening_type1',
-                    month: monthKey,
-                  });
-                  weeklyShifts[employee.id].evening = true;
-                  weeklyShifts[employee.id].count++;
-                  type1EveningIndex = (empIndex + 1) % type1Employees.length;
-                  assigned = true;
-                }
-              }
+            const result = findEmployeeForShift(type1Employees, type1EveningIndex, true);
+            if (result) {
+              newShifts.push({
+                employee_id: result.employee.id,
+                date: dateStr,
+                shift_type: 'evening_type1',
+                month: monthKey,
+              });
+              weeklyShifts[result.employee.id].evening = true;
+              weeklyShifts[result.employee.id].count++;
+              type1EveningIndex = (result.index + 1) % type1Employees.length;
             }
           }
 
           // שיבוץ משמרת ערב type2
           if (type2Employees.length > 0) {
-            let assigned = false;
-            for (let i = 0; i < type2Employees.length && !assigned; i++) {
-              const empIndex = (type2EveningIndex + i) % type2Employees.length;
-              const employee = type2Employees[empIndex];
-              
-              const alreadyMorningToday = newShifts.some(
-                s => s.employee_id === employee.id && s.date === dateStr
-              );
-              
-              if (!weeklyShifts[employee.id].evening && weeklyShifts[employee.id].count < 2 && !alreadyMorningToday) {
-                const pref = constraints.find(c => c.employee_id === employee.id && c.date === dateStr);
-                if (!pref || pref.constraint_type !== 'prefer_morning') {
-                  newShifts.push({
-                    employee_id: employee.id,
-                    date: dateStr,
-                    shift_type: 'evening_type2',
-                    month: monthKey,
-                  });
-                  weeklyShifts[employee.id].evening = true;
-                  weeklyShifts[employee.id].count++;
-                  type2EveningIndex = (empIndex + 1) % type2Employees.length;
-                  assigned = true;
-                }
-              }
+            const result = findEmployeeForShift(type2Employees, type2EveningIndex, true);
+            if (result) {
+              newShifts.push({
+                employee_id: result.employee.id,
+                date: dateStr,
+                shift_type: 'evening_type2',
+                month: monthKey,
+              });
+              weeklyShifts[result.employee.id].evening = true;
+              weeklyShifts[result.employee.id].count++;
+              type2EveningIndex = (result.index + 1) % type2Employees.length;
             }
           }
         }

@@ -278,6 +278,26 @@ export default function EmployeeConstraints() {
           </div>
         </div>
 
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-xl font-bold text-gray-800">סטטוס אישור חודשי</h2>
+              <p className="text-sm text-gray-600 mt-1">אשר את האילוצים שלך לחודש זה</p>
+            </div>
+            <Button 
+              onClick={() => {
+                toast({ 
+                  title: '✓ האילוצים שלך אושרו!', 
+                  description: 'המנהל יקבל הודעה על האישור'
+                });
+              }}
+              className="bg-green-600 hover:bg-green-700 text-white font-bold text-lg px-8 py-6"
+            >
+              ✓ אשר אילוצים סופית
+            </Button>
+          </div>
+        </div>
+
         <Tabs defaultValue="shifts" className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-6">
             <TabsTrigger value="shifts">המשמרות שלי</TabsTrigger>

@@ -2,7 +2,7 @@ import React from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from 'date-fns';
 import { he } from 'date-fns/locale';
 
-const DAYS_OF_WEEK = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+const DAYS_OF_WEEK = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי'];
 
 export default function MonthCalendar({ year, month, renderDay }) {
   const monthStart = startOfMonth(new Date(year, month - 1));
@@ -18,24 +18,19 @@ export default function MonthCalendar({ year, month, renderDay }) {
         {format(monthStart, 'MMMM yyyy', { locale: he })}
       </h2>
       
-      <div className="grid grid-cols-7 gap-2">
+      <div className="grid grid-cols-6 gap-2">
         {DAYS_OF_WEEK.map((day) => (
           <div key={day} className="text-center font-bold text-gray-700 py-2">
             {day}
           </div>
         ))}
         
-        {emptyDays.map((_, index) => (
-          <div key={`empty-${index}`} className="p-2"></div>
-        ))}
-        
-        {days.map((day) => {
-          const dayOfWeek = getDay(day);
-          if (dayOfWeek === 6) {
-            return <div key={day.toString()} className="p-2 bg-gray-100 border border-gray-200 rounded-lg"></div>;
-          }
-          return renderDay(day);
+        {emptyDays.map((_, index) => {
+          if (index === 6) return null;
+          return <div key={`empty-${index}`} className="p-2"></div>;
         })}
+        
+        {days.map((day) => renderDay(day))}
       </div>
     </div>
   );

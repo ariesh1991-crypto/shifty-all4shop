@@ -132,9 +132,14 @@ export default function ManagerDashboard() {
       const monthEnd = new Date(year, month, 0);
       const daysInMonth = monthEnd.getDate();
 
-      // מחיקת משמרות קיימות של החודש
-      for (const shift of shifts) {
-        await deleteShiftMutation.mutateAsync(shift.id);
+      // מחיקת משמרות קיימות של החודש (מחיקה קבוצתית)
+      if (shifts.length > 0) {
+        const shiftIdsToDelete = shifts.map(s => s.id);
+        for (const id of shiftIdsToDelete) {
+          await deleteShiftMutation.mutateAsync(id);
+        }
+        // המתנה קצרה כדי לא לעבור את ה-rate limit
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
 
       const newShifts = [];

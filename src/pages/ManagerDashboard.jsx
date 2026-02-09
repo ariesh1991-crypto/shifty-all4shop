@@ -350,12 +350,13 @@ export default function ManagerDashboard() {
         <div className="space-y-1">
           {dayShifts.map((shift) => {
             const employee = employees.find((e) => e.id === shift.employee_id);
+            if (!employee) return null;
             return (
               <div
                 key={shift.id}
                 className={`text-xs p-1 rounded ${SHIFT_COLORS[shift.shift_type]} text-center`}
               >
-                {employee?.full_name} - {SHIFT_LABELS[shift.shift_type]}
+                {employee.full_name} - {SHIFT_LABELS[shift.shift_type]}
               </div>
             );
           })}

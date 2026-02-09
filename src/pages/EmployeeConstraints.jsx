@@ -153,9 +153,12 @@ export default function EmployeeConstraints() {
   };
 
   const renderConstraintDay = (date) => {
+    const dayOfWeek = format(date, 'i');
+    if (dayOfWeek === '6') return null;
+    
     const constraint = getConstraintForDate(date);
     const dayNumber = format(date, 'd');
-    const isWeekend = format(date, 'i') === '6' || format(date, 'i') === '7';
+    const isFriday = dayOfWeek === '5';
 
     return (
       <div
@@ -164,7 +167,7 @@ export default function EmployeeConstraints() {
         className={`
           p-3 border rounded-lg cursor-pointer transition-all hover:shadow-md
           ${constraint ? CONSTRAINT_COLORS[constraint.constraint_type] : 'bg-gray-50 hover:bg-gray-100'}
-          ${isWeekend ? 'border-blue-300' : 'border-gray-200'}
+          ${isFriday ? 'border-blue-300' : 'border-gray-200'}
         `}
       >
         <div className="font-bold text-center mb-1">{dayNumber}</div>
@@ -178,16 +181,19 @@ export default function EmployeeConstraints() {
   };
 
   const renderShiftDay = (date) => {
+    const dayOfWeek = format(date, 'i');
+    if (dayOfWeek === '6') return null;
+    
     const dayShifts = getShiftsForDate(date);
     const dayNumber = format(date, 'd');
-    const isWeekend = format(date, 'i') === '6' || format(date, 'i') === '7';
+    const isFriday = dayOfWeek === '5';
 
     return (
       <div
         key={date.toString()}
         className={`
           p-2 border rounded-lg min-h-[80px]
-          ${isWeekend ? 'bg-gray-100 border-blue-300' : 'bg-white border-gray-200'}
+          ${isFriday ? 'bg-blue-50 border-blue-300' : 'bg-white border-gray-200'}
         `}
       >
         <div className="font-bold text-center mb-2">{dayNumber}</div>

@@ -32,9 +32,10 @@ export default function EmployeeConstraints() {
     const loadCurrentEmployee = async () => {
       try {
         const user = await base44.auth.me();
-        const employees = await base44.entities.Employee.filter({ email: user.email });
-        if (employees.length > 0) {
-          setCurrentEmployee(employees[0]);
+        const allEmployees = await base44.entities.Employee.list();
+        const employee = allEmployees.find(emp => emp.email.toLowerCase() === user.email.toLowerCase());
+        if (employee) {
+          setCurrentEmployee(employee);
         }
       } finally {
         setLoading(false);

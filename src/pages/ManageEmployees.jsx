@@ -87,6 +87,7 @@ export default function ManageEmployees() {
       queryClient.invalidateQueries(['employees']);
       toast({ title: 'משתמש חובר לעובד בהצלחה' });
       setLinkDialogOpen(false);
+      setQuickLinkDialogOpen(false);
     },
   });
 

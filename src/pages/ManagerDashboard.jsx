@@ -258,10 +258,17 @@ export default function ManagerDashboard() {
   const generateSchedule = async () => {
     setGenerating(true);
     try {
-      // מחיקה מלאה של כל המשמרות לחודש
+      // מחיקה מלאה של כל המשמרות לחודש בבאצ'ים קטנים
       const shiftsToDelete = allShifts.filter(s => s.date && s.date.startsWith(monthKey));
       if (shiftsToDelete.length > 0) {
-        await Promise.all(shiftsToDelete.map(shift => deleteShiftMutation.mutateAsync(shift.id)));
+        const batchSize = 5;
+        for (let i = 0; i < shiftsToDelete.length; i += batchSize) {
+          const batch = shiftsToDelete.slice(i, i + batchSize);
+          await Promise.all(batch.map(shift => deleteShiftMutation.mutateAsync(shift.id)));
+          if (i + batchSize < shiftsToDelete.length) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        }
       }
 
       const monthStart = startOfMonth(new Date(year, month - 1));
@@ -554,7 +561,14 @@ Only return the JSON array, no additional text.`,
               onClick={async () => {
                 if (confirm('האם אתה בטוח שברצונך למחוק את כל המשמרות לחודש הנוכחי?')) {
                   const shiftsToDelete = allShifts.filter(s => s.date && s.date.startsWith(monthKey));
-                  await Promise.all(shiftsToDelete.map(shift => deleteShiftMutation.mutateAsync(shift.id)));
+                  const batchSize = 5;
+                  for (let i = 0; i < shiftsToDelete.length; i += batchSize) {
+                    const batch = shiftsToDelete.slice(i, i + batchSize);
+                    await Promise.all(batch.map(shift => deleteShiftMutation.mutateAsync(shift.id)));
+                    if (i + batchSize < shiftsToDelete.length) {
+                      await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+                  }
                 }
               }}
               variant="destructive"

@@ -71,7 +71,7 @@ export default function ManageEmployees() {
     mutationFn: ({ id, data }) => base44.entities.Employee.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries(['employees']);
-      toast({ title: 'עובד עודכן בהצלחה' });
+      // עובד עודכן
       setDialogOpen(false);
       resetForm();
     },
@@ -81,7 +81,7 @@ export default function ManageEmployees() {
     mutationFn: (id) => base44.entities.Employee.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['employees']);
-      toast({ title: 'עובד נמחק בהצלחה' });
+      // עובד נמחק
     },
   });
 

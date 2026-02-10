@@ -30,6 +30,49 @@ const STATUS_COLORS = {
   'חריגה מאושרת': 'border-amber-500',
 };
 
+// וולידציה של סידור משמרות
+function validateSchedule(aiShifts, employees, constraints, days) {
+  const errors = [];
+  const employeeShifts = {};
+  const employeeFridayShifts = {};
+
+  // ספירת משמרות לפי עובד ושבוע
+  for (const shift of aiShifts) {
+    if (!shift.employee_id) continue;
+
+    const shiftDate = parseISO(shift.date);
+    const weekStart = startOfWeek(shiftDate, { weekStartsOn: 0 });
+    const weekKey = format(weekStart, 'yyyy-MM-dd');
+    const monthKey = format(shiftDate, 'yyyy-MM');
+
+    // ספירת משמרות בשבוע
+    const empWeekKey = `${shift.employee_id}_${weekKey}`;
+    employeeShifts[empWeekKey] = (employeeShifts[empWeekKey] || 0) + 1;
+
+    if (employeeShifts[empWeekKey] > 2) {
+      errors.push(`עובד ${shift.employee_id} משובץ ליותר מ-2 משמרות בשבוע ${weekKey}`);
+    }
+
+    // ספירת משמרות שישי בחודש
+    if (shift.shift_type === 'שישי קצר' || shift.shift_type === 'שישי ארוך') {
+      const empMonthKey = `${shift.employee_id}_${monthKey}`;
+      employeeFridayShifts[empMonthKey] = (employeeFridayShifts[empMonthKey] || 0) + 1;
+
+      if (employeeFridayShifts[empMonthKey] > 1) {
+        errors.push(`עובד ${shift.employee_id} משובץ ליותר ממשמרת שישי אחת בחודש ${monthKey}`);
+      }
+    }
+
+    // בדיקת אי-זמינות
+    const constraint = constraints.find(c => c.employee_id === shift.employee_id && c.date === shift.date);
+    if (constraint && constraint.unavailable) {
+      errors.push(`עובד ${shift.employee_id} משובץ למשמרת בתאריך ${shift.date} שבו הוא לא זמין`);
+    }
+  }
+
+  return errors;
+}
+
 // פונקציה לחישוב שעות
 function calculateShiftTimes(shiftType, contractType) {
   if (shiftType === 'שישי קצר') return { start: '08:30', end: '12:00' };
@@ -87,6 +130,18 @@ export default function ManagerDashboard() {
     },
   });
 
+  const approveScheduleMutation = useMutation({
+    mutationFn: async () => {
+      const drafts = allShifts.filter(s => s.schedule_status === 'טיוטה');
+      await Promise.all(drafts.map(shift => 
+        base44.entities.Shift.update(shift.id, { ...shift, schedule_status: 'מאושר' })
+      ));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['shifts']);
+    },
+  });
+
   const shifts = allShifts.filter(shift => {
     const employeeMatch = filterEmployee === 'all' || shift.assigned_employee_id === filterEmployee;
     const shiftTypeMatch = filterShiftType === 'all' || shift.shift_type === filterShiftType;
@@ -97,7 +152,7 @@ export default function ManagerDashboard() {
     mutationFn: (data) => base44.entities.Shift.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries(['shifts']);
-      toast({ title: 'משמרת נוצרה' });
+      // משמרת נוצרה
     },
   });
 
@@ -127,7 +182,7 @@ export default function ManagerDashboard() {
     mutationFn: ({ id, data }) => base44.entities.Shift.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries(['shifts']);
-      toast({ title: 'המשמרת עודכנה' });
+      // המשמרת עודכנה
     },
   });
 
@@ -135,7 +190,7 @@ export default function ManagerDashboard() {
     mutationFn: ({ id, data }) => base44.entities.SwapRequest.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries(['swapRequests']);
-      toast({ title: 'בקשת החלפה עודכנה' });
+      // בקשת החלפה עודכנה
     },
   });
 
@@ -203,8 +258,10 @@ export default function ManagerDashboard() {
   const generateSchedule = async () => {
     setGenerating(true);
     try {
-      for (const shift of allShifts) {
-        await deleteShiftMutation.mutateAsync(shift.id);
+      // מחיקה מלאה של כל המשמרות לחודש
+      const shiftsToDelete = allShifts.filter(s => s.date && s.date.startsWith(monthKey));
+      if (shiftsToDelete.length > 0) {
+        await Promise.all(shiftsToDelete.map(shift => deleteShiftMutation.mutateAsync(shift.id)));
       }
 
       const monthStart = startOfMonth(new Date(year, month - 1));
@@ -236,53 +293,76 @@ export default function ManagerDashboard() {
           is_friday: getDay(d) === 5,
         }));
 
-      toast({ title: 'מייצר סידור משמרות מבוסס AI...', description: 'זה עשוי לקחת כמה שניות' });
+      // מייצר סידור
 
       // קריאה ל-AI
       const aiResponse = await base44.integrations.Core.InvokeLLM({
-        prompt: `You are an expert shift scheduler. Generate an optimal monthly shift schedule.
+        prompt: `You are an EXPERT shift scheduler. Your PRIMARY GOAL is to create a FULLY COMPLIANT schedule that strictly adheres to ALL rules.
 
-EMPLOYEES:
+EMPLOYEES (${activeEmployees.length} active employees):
 ${JSON.stringify(employeeData, null, 2)}
 
-CONSTRAINTS (unavailability and preferences):
+CONSTRAINTS (unavailability and preferences - MUST BE RESPECTED):
 ${JSON.stringify(constraintData, null, 2)}
 
-DATES TO SCHEDULE:
+DATES TO SCHEDULE (${datesData.length} working days):
 ${JSON.stringify(datesData, null, 2)}
 
-CRITICAL RULES (MUST BE FOLLOWED STRICTLY):
+=== CRITICAL RULES - ABSOLUTE REQUIREMENTS ===
+
+SHIFT REQUIREMENTS:
 1. Each regular day (Sunday-Thursday) needs EXACTLY 2 shifts: one "קצרה" (short) and one "ארוכה" (long)
-2. Friday needs EXACTLY 2 shifts: one "שישי קצר" (short Friday) and one "שישי ארוך" (long Friday)
-3. No Saturday shifts
-4. MAXIMUM 2 shifts per employee per week (Sunday-Saturday): one short shift + one long shift. Friday shifts count as part of this limit.
-5. Each employee gets MAXIMUM 1 Friday shift per month (either שישי קצר OR שישי ארוך, not both)
-6. NEVER assign the same employee to more than 2 shifts in any 7-day period
-7. Avoid assigning Friday shift after Thursday long shift to the same employee
-8. NEVER assign an employee who is unavailable (unavailable: true)
-9. Prefer assigning employees according to their preferences when possible
-10. Balance workload evenly across all employees throughout the month
-11. Each shift MUST have an employee assigned - minimize unassigned shifts
+2. Each Friday needs EXACTLY 2 shifts: one "שישי קצר" and one "שישי ארוך"
+3. NO Saturday shifts - ever
+4. EVERY shift MUST have an employee assigned (unassigned shifts = FAILURE)
 
-VALIDATION CHECKLIST (check before returning):
-- No employee appears more than twice in any single week
-- No employee has both short and long shifts on the same day
-- No employee has more than one Friday shift in the month
-- All unavailable employees are excluded from their unavailable dates
-- Every date has both required shift types assigned
+EMPLOYEE LIMITS (STRICTLY ENFORCE):
+5. MAXIMUM 2 shifts per employee per calendar week (Sunday-Saturday)
+   - This means: one קצרה + one ארוכה in the same week
+   - Friday shifts COUNT toward this weekly limit
+6. MAXIMUM 1 Friday shift per employee per MONTH (either שישי קצר OR שישי ארוך, NOT both)
+7. NEVER assign the same employee to more than 2 shifts in any consecutive 7-day period
+8. AVOID assigning a Friday shift to an employee who worked Thursday ארוכה (long shift)
 
-Return a JSON array of shift assignments with this structure:
+CONSTRAINTS:
+9. NEVER assign an employee who is unavailable (unavailable: true) on a specific date
+10. When possible, PREFER employees with matching preferences (e.g., "מעדיף קצרה" for קצרה shifts)
+
+WORKLOAD BALANCE:
+11. Distribute shifts EVENLY across all employees throughout the month
+12. Every employee should get approximately the same total number of shifts
+
+=== MANDATORY VALIDATION CHECKLIST ===
+Before returning your schedule, verify EVERY item below:
+
+□ No employee has more than 2 shifts in any single calendar week (Sun-Sat)
+□ No employee has more than 1 Friday shift in the entire month
+□ No employee is assigned to a date when they are marked as unavailable
+□ Every date has BOTH required shift types assigned
+□ Every shift has an employee assigned (no null/empty employee_id)
+□ No employee has both קצרה and ארוכה on the same day
+□ Workload is balanced - no employee has significantly more shifts than others
+□ No employee works Thursday ארוכה followed by Friday shift (if possible)
+
+=== OUTPUT FORMAT ===
+Return a JSON array with this EXACT structure:
 [
   {
     "date": "2026-02-01",
     "shift_type": "קצרה",
     "employee_id": "emp123",
-    "reason": "Short explanation for assignment"
+    "reason": "Balanced assignment, employee available"
   },
   ...
 ]
 
-Only return the JSON array, no other text.`,
+IMPORTANT: 
+- If you cannot assign a shift while following ALL rules, try alternative assignments
+- NEVER leave employee_id empty or null
+- Double-check your work against the validation checklist before returning
+- Quality over speed - a correct schedule is the only acceptable output
+
+Only return the JSON array, no additional text.`,
         response_json_schema: {
           type: "object",
           properties: {
@@ -305,6 +385,14 @@ Only return the JSON array, no other text.`,
       });
 
       const aiShifts = aiResponse.shifts || [];
+      
+      // וולידציה של תוצאות ה-AI
+      const validationErrors = validateSchedule(aiShifts, activeEmployees, constraints, days);
+      
+      if (validationErrors.length > 0) {
+        console.warn('שגיאות וולידציה בסידור:', validationErrors);
+      }
+      
       const newShifts = [];
 
       for (const aiShift of aiShifts) {
@@ -319,6 +407,7 @@ Only return the JSON array, no other text.`,
             start_time: times.start,
             end_time: times.end,
             status: 'תקין',
+            schedule_status: 'טיוטה',
           });
         } else if (aiShift.shift_type) {
           // משמרת ללא עובד - סימון בעיה
@@ -326,6 +415,7 @@ Only return the JSON array, no other text.`,
             date: aiShift.date,
             shift_type: aiShift.shift_type,
             status: 'בעיה',
+            schedule_status: 'טיוטה',
           });
         }
       }
@@ -336,12 +426,9 @@ Only return the JSON array, no other text.`,
       const assignedCount = newShifts.filter(s => s.assigned_employee_id).length;
       const problematicCount = newShifts.filter(s => s.status === 'בעיה').length;
       
-      toast({ 
-        title: `נוצרו ${newShifts.length} משמרות`,
-        description: `${assignedCount} משובצות, ${problematicCount} ללא עובד זמין`
-      });
+      // נוצרו משמרות
     } catch (error) {
-      toast({ title: 'שגיאה', description: error.message, variant: 'destructive' });
+      console.error('שגיאה ביצירת סידור:', error);
     } finally {
       setGenerating(false);
     }
@@ -376,7 +463,7 @@ Only return the JSON array, no other text.`,
     await base44.entities.Shift.bulkCreate(newShifts);
     queryClient.invalidateQueries(['shifts']);
     setRecurringDialogOpen(false);
-    toast({ title: `נוצרו ${newShifts.length} משמרות` });
+    // נוצרו משמרות חוזרות
   };
 
   const renderDay = (date) => {
@@ -448,9 +535,20 @@ Only return the JSON array, no other text.`,
               <ArrowLeftRight className="w-4 h-4 ml-2" />
               בקשות החלפה {pendingSwaps.length > 0 && `(${pendingSwaps.length})`}
             </Button>
-            <Button onClick={generateSchedule} disabled={generating}>
+            <Button 
+              onClick={generateSchedule} 
+              disabled={generating}
+              variant="default"
+            >
               <Sparkles className="w-4 h-4 ml-2" />
               {generating ? 'יוצר...' : 'צור סקיצת משמרות'}
+            </Button>
+            <Button 
+              onClick={() => approveScheduleMutation.mutate()}
+              disabled={allShifts.filter(s => s.schedule_status === 'טיוטה').length === 0}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              אשר סידור
             </Button>
             <Button onClick={() => setCurrentDate(new Date(year, month - 2))} variant="outline">
               <ChevronRight className="w-5 h-5" />
@@ -593,6 +691,7 @@ function ShiftEditor({ selectedDate, shifts, employees, onDelete, onUpdate, onCr
       start_time: times.start,
       end_time: times.end,
       status: 'תקין',
+      schedule_status: 'טיוטה',
     });
     
     setNewShiftType('');

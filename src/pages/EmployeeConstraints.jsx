@@ -79,7 +79,7 @@ export default function EmployeeConstraints() {
     mutationFn: (id) => base44.entities.Constraint.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['constraints']);
-      toast({ title: 'אילוץ נמחק' });
+      // אילוץ נמחק
     },
   });
 

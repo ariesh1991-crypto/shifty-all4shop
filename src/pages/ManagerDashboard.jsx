@@ -86,28 +86,6 @@ export default function ManagerDashboard() {
     loadUser();
   }, []);
 
-  // התראה אוטומטית על משמרות לא שלמות
-  React.useEffect(() => {
-    if (!allShifts.length || !currentUser) return;
-    
-    const incompleteShifts = allShifts.filter(s => 
-      s.status === 'בעיה' || !s.assigned_employee_id
-    );
-    
-    if (incompleteShifts.length > 0) {
-      const shiftList = incompleteShifts.slice(0, 5).map(s => 
-        `${format(new Date(s.date), 'dd/MM/yyyy')} - ${s.shift_type}`
-      ).join(', ');
-      
-      toast({
-        title: `⚠️ ${incompleteShifts.length} משמרות לא משובצות`,
-        description: `${shiftList}${incompleteShifts.length > 5 ? '...' : ''}`,
-        variant: 'destructive',
-        duration: 8000,
-      });
-    }
-  }, [allShifts, currentUser]);
-
   const year = getYear(currentDate);
   const month = getMonth(currentDate) + 1;
   const monthKey = `${year}-${String(month).padStart(2, '0')}`;
@@ -182,6 +160,28 @@ export default function ManagerDashboard() {
   });
 
   const pendingSwaps = swapRequests.filter(req => req.status === 'ממתין לאישור');
+
+  // התראה אוטומטית על משמרות לא שלמות
+  React.useEffect(() => {
+    if (!allShifts.length || !currentUser) return;
+    
+    const incompleteShifts = allShifts.filter(s => 
+      s.status === 'בעיה' || !s.assigned_employee_id
+    );
+    
+    if (incompleteShifts.length > 0) {
+      const shiftList = incompleteShifts.slice(0, 5).map(s => 
+        `${format(new Date(s.date), 'dd/MM/yyyy')} - ${s.shift_type}`
+      ).join(', ');
+      
+      toast({
+        title: `⚠️ ${incompleteShifts.length} משמרות לא משובצות`,
+        description: `${shiftList}${incompleteShifts.length > 5 ? '...' : ''}`,
+        variant: 'destructive',
+        duration: 8000,
+      });
+    }
+  }, [allShifts, currentUser, toast]);
 
   const deleteShiftMutation = useMutation({
     mutationFn: (id) => base44.entities.Shift.delete(id),

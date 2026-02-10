@@ -3,6 +3,8 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, getMonth, getYear, getDay, startOfMonth, endOfMonth } from 'date-fns';
 import { ChevronLeft, ChevronRight, LogOut, Calendar } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { createPageUrl } from '../utils';
 import NotificationBell from '../components/notifications/NotificationBell';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';

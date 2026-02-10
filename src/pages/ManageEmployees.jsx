@@ -122,6 +122,8 @@ export default function ManageEmployees() {
     return matchesSearch && matchesActive;
   });
 
+  const unlinkedUsers = users.filter(u => !employees.some(e => e.user_id === u.id));
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-6" dir="rtl">
       <div className="max-w-7xl mx-auto">
@@ -135,27 +137,103 @@ export default function ManageEmployees() {
           </Link>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-4 mb-4">
-          <div className="flex gap-4 items-center">
-            <div className="flex-1 relative">
-              <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <Input
-                placeholder="חיפוש עובד לפי שם..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pr-10"
-              />
+        {unlinkedUsers.length > 0 && (
+          <div className="bg-orange-50 border-2 border-orange-400 rounded-lg p-6 mb-6">
+            <div className="flex items-start gap-4">
+              <div className="bg-orange-200 rounded-full p-3 flex-shrink-0">
+                <UserPlus className="w-8 h-8 text-orange-700" />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-2xl font-bold text-orange-900 mb-2">
+                  ⚠️ {unlinkedUsers.length} משתמשים ממתינים לחיבור
+                </h2>
+                <p className="text-orange-800 mb-4 text-lg">
+                  המשתמשים הבאים נרשמו למערכת. חבר כל אחד לרשומת העובד המתאימה:
+                </p>
+                <div className="space-y-3">
+                  {unlinkedUsers.map(user => (
+                    <div key={user.id} className="bg-white rounded-lg p-4 flex justify-between items-center shadow-md border-2 border-orange-200">
+                      <div>
+                        <div className="font-bold text-xl">{user.full_name}</div>
+                        <div className="text-gray-600 text-lg">{user.email}</div>
+                        <div className="text-sm text-gray-500 mt-1">
+                          נרשם: {new Date(user.created_date).toLocaleDateString('he-IL', { 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric' 
+                          })}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="lg"
+                          onClick={() => {
+                            const matchingEmp = employees.find(e => 
+                              e.full_name.toLowerCase().includes(user.full_name?.toLowerCase() || '')
+                            );
+                            if (matchingEmp) {
+                              linkUserMutation.mutate({ 
+                                employeeId: matchingEmp.id, 
+                                userId: user.id 
+                              });
+                            } else {
+                              alert('לא נמצא עובד מתאים. צור תחילה רשומת עובד עבור ' + user.full_name);
+                            }
+                          }}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          חיבור מהיר
+                        </Button>
+                        <Button
+                          size="lg"
+                          variant="outline"
+                          onClick={() => {
+                            setFormData({
+                              full_name: user.full_name || user.email,
+                              active: true,
+                              contract_type: '08:00–17:00 / 10:00–19:00',
+                              notes: '',
+                            });
+                            setDialogOpen(true);
+                          }}
+                        >
+                          צור עובד חדש
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
-            <Select value={filterActive} onValueChange={setFilterActive}>
-              <SelectTrigger className="w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">הכל</SelectItem>
-                <SelectItem value="active">פעילים</SelectItem>
-                <SelectItem value="inactive">לא פעילים</SelectItem>
-              </SelectContent>
-            </Select>
+          </div>
+        )}
+
+        <div className="bg-white rounded-lg shadow-md p-4 mb-4">
+          <div className="flex gap-4 items-center justify-between">
+            <div className="flex gap-4 items-center flex-1">
+              <div className="flex-1 relative">
+                <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Input
+                  placeholder="חיפוש עובד לפי שם..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pr-10"
+                />
+              </div>
+              <Select value={filterActive} onValueChange={setFilterActive}>
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">הכל</SelectItem>
+                  <SelectItem value="active">פעילים</SelectItem>
+                  <SelectItem value="inactive">לא פעילים</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={() => setDialogOpen(true)} size="lg">
+              + הוסף עובד חדש
+            </Button>
           </div>
         </div>
 

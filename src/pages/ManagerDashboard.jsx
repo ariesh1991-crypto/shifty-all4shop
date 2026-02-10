@@ -321,13 +321,11 @@ export default function ManagerDashboard() {
       // מחק משמרות קיימות
       const shiftsToDelete = allShifts.filter(s => s.date && s.date.startsWith(monthKey));
       if (shiftsToDelete.length > 0) {
-        const batchSize = 5;
+        const batchSize = 3;
         for (let i = 0; i < shiftsToDelete.length; i += batchSize) {
           const batch = shiftsToDelete.slice(i, i + batchSize);
           await Promise.all(batch.map(shift => deleteShiftMutation.mutateAsync(shift.id)));
-          if (i + batchSize < shiftsToDelete.length) {
-            await new Promise(resolve => setTimeout(resolve, 200));
-          }
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
 
@@ -473,7 +471,16 @@ export default function ManagerDashboard() {
         }
       }
 
-      await base44.entities.Shift.bulkCreate(newShifts);
+      // צור משמרות ב-batches כדי לא לעבור rate limit
+      const createBatchSize = 10;
+      for (let i = 0; i < newShifts.length; i += createBatchSize) {
+        const batch = newShifts.slice(i, i + createBatchSize);
+        await base44.entities.Shift.bulkCreate(batch);
+        if (i + createBatchSize < newShifts.length) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+      
       queryClient.invalidateQueries(['shifts']);
 
       // הצג סיכום
@@ -653,17 +660,16 @@ export default function ManagerDashboard() {
                 if (confirm('האם אתה בטוח שברצונך למחוק את כל המשמרות לחודש הנוכחי?')) {
                   try {
                     const shiftsToDelete = allShifts;
-                    const batchSize = 5;
+                    const batchSize = 3;
                     for (let i = 0; i < shiftsToDelete.length; i += batchSize) {
                       const batch = shiftsToDelete.slice(i, i + batchSize);
                       await Promise.all(batch.map(shift => deleteShiftMutation.mutateAsync(shift.id)));
-                      if (i + batchSize < shiftsToDelete.length) {
-                        await new Promise(resolve => setTimeout(resolve, 200));
-                      }
+                      await new Promise(resolve => setTimeout(resolve, 500));
                     }
                     toast({ title: 'כל המשמרות נמחקו' });
                   } catch (error) {
-                    toast({ title: 'שגיאה במחיקת משמרות', variant: 'destructive' });
+                    console.error('Error deleting shifts:', error);
+                    toast({ title: 'שגיאה במחיקת משמרות', description: error.message, variant: 'destructive' });
                   }
                 }
               }}

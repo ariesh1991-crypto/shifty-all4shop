@@ -46,39 +46,9 @@ const UserNotRegisteredError = () => {
     loadUser();
   }, []);
 
+  // מנהלים מקבלים גישה ישירה למערכת גם בלי חיבור לעובד
   if (isAdmin) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-6" dir="rtl">
-        <div className="max-w-2xl w-full p-8 bg-white rounded-lg shadow-lg">
-          <div className="text-center">
-            <AlertCircle className="w-16 h-16 text-blue-500 mx-auto mb-4" />
-            <h1 className="text-3xl font-bold text-gray-900 mb-4">אתה מנהל - חבר את עצמך לרשומת עובד</h1>
-            <p className="text-gray-600 mb-6 text-lg">
-              בתור מנהל, אתה צריך ליצור רשומת עובד עבור עצמך ולחבר אותה למשתמש שלך.
-            </p>
-            <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-6 mb-6 text-right">
-              <p className="font-bold mb-3 text-lg">שלבים:</p>
-              <ol className="list-decimal list-inside space-y-2 text-gray-700">
-                <li>עבור ל"ניהול עובדים"</li>
-                <li>צור רשומת עובד חדשה עבור עצמך</li>
-                <li>לחץ על כפתור "חיבור משתמש" ליד העובד שיצרת</li>
-                <li>בחר את המשתמש שלך מהרשימה</li>
-                <li>רענן את הדף</li>
-              </ol>
-            </div>
-            <div className="flex gap-3 justify-center">
-              <Button onClick={() => window.location.href = '/ManageEmployees'}>
-                עבור לניהול עובדים
-              </Button>
-              <Button variant="outline" onClick={() => base44.auth.logout()}>
-                <LogOut className="w-4 h-4 ml-2" />
-                יציאה
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return (

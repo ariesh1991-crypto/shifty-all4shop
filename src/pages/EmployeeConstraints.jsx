@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, getMonth, getYear, getDay, startOfMonth, endOfMonth } from 'date-fns';
-import { ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
+import { ChevronLeft, ChevronRight, LogOut, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import MonthCalendar from '../components/shifts/MonthCalendar';
 
@@ -16,6 +18,7 @@ export default function EmployeeConstraints() {
   const [currentEmployee, setCurrentEmployee] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [rangeDialogOpen, setRangeDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -83,6 +86,29 @@ export default function EmployeeConstraints() {
     }
   };
 
+  const handleSaveRangeConstraint = async (startDate, endDate, constraintData) => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const dates = [];
+    
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const dateStr = format(d, 'yyyy-MM-dd');
+      dates.push(dateStr);
+    }
+
+    for (const date of dates) {
+      const existing = constraints.find(c => c.date === date);
+      if (existing) {
+        await updateConstraintMutation.mutateAsync({ id: existing.id, data: constraintData });
+      } else {
+        await createConstraintMutation.mutateAsync({ ...constraintData, employee_id: currentEmployee.id, date });
+      }
+    }
+    
+    setRangeDialogOpen(false);
+    toast({ title: `נשמרו ${dates.length} ימים` });
+  };
+
   const renderDay = (date) => {
     const dayOfWeek = getDay(date);
     if (dayOfWeek === 6) return null;
@@ -140,6 +166,10 @@ export default function EmployeeConstraints() {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">{currentEmployee.full_name} - אילוצים והעדפות</h1>
           <div className="flex gap-2">
+            <Button onClick={() => setRangeDialogOpen(true)} variant="default">
+              <Calendar className="w-4 h-4 ml-2" />
+              בקשת חופשה/יציאה
+            </Button>
             <Button onClick={() => setCurrentDate(new Date(year, month - 2))} variant="outline">
               <ChevronRight className="w-5 h-5" />
             </Button>
@@ -186,6 +216,15 @@ export default function EmployeeConstraints() {
             />
           </DialogContent>
         </Dialog>
+
+        <Dialog open={rangeDialogOpen} onOpenChange={setRangeDialogOpen}>
+          <DialogContent dir="rtl" className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>בקשת חופשה או יציאה מרוכזת</DialogTitle>
+            </DialogHeader>
+            <RangeConstraintForm onSave={handleSaveRangeConstraint} />
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
@@ -194,6 +233,7 @@ export default function EmployeeConstraints() {
 function ConstraintForm({ selectedDate, existingConstraint, onSave, onDelete }) {
   const [unavailable, setUnavailable] = useState(existingConstraint?.unavailable || false);
   const [preference, setPreference] = useState(existingConstraint?.preference || 'אין העדפה');
+  const [notes, setNotes] = useState(existingConstraint?.notes || '');
 
   return (
     <div className="space-y-4">
@@ -216,16 +256,82 @@ function ConstraintForm({ selectedDate, existingConstraint, onSave, onDelete }) 
         </Select>
       </div>
 
+      <div>
+        <Label>הערות</Label>
+        <Textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="הערות נוספות (אופציונלי)"
+          rows={3}
+        />
+      </div>
+
       <div className="flex gap-3 justify-end">
         {existingConstraint && (
           <Button variant="destructive" onClick={() => onDelete(existingConstraint.id)}>
             מחק
           </Button>
         )}
-        <Button onClick={() => onSave({ unavailable, preference })}>
+        <Button onClick={() => onSave({ unavailable, preference, notes })}>
           שמור
         </Button>
       </div>
     </div>
+  );
+}
+
+function RangeConstraintForm({ onSave }) {
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [unavailable, setUnavailable] = useState(true);
+  const [notes, setNotes] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!startDate || !endDate) return;
+    onSave(startDate, endDate, { unavailable, preference: 'אין העדפה', notes });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <Label>תאריך התחלה</Label>
+        <Input
+          type="date"
+          value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
+          required
+        />
+      </div>
+
+      <div>
+        <Label>תאריך סיום</Label>
+        <Input
+          type="date"
+          value={endDate}
+          onChange={(e) => setEndDate(e.target.value)}
+          required
+        />
+      </div>
+
+      <div className="flex items-center gap-3">
+        <Switch checked={unavailable} onCheckedChange={setUnavailable} />
+        <Label>סמן כלא זמין</Label>
+      </div>
+
+      <div>
+        <Label>סיבה/הערות</Label>
+        <Textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="למשל: חופשה, יציאה מרוכזת, מילואים..."
+          rows={3}
+        />
+      </div>
+
+      <div className="flex gap-3 justify-end">
+        <Button type="submit">שמור טווח תאריכים</Button>
+      </div>
+    </form>
   );
 }

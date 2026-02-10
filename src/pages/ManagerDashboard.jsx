@@ -75,6 +75,7 @@ export default function ManagerDashboard() {
   const [currentUser, setCurrentUser] = useState(null);
   const [filterEmployee, setFilterEmployee] = useState('all');
   const [filterShiftType, setFilterShiftType] = useState('all');
+  const [scheduleAlerts, setScheduleAlerts] = useState([]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -448,6 +449,7 @@ export default function ManagerDashboard() {
 
       const newShifts = [];
       const unassignedShifts = [];
+      const alerts = [];
 
       // צור משמרות לכל יום
       for (const day of days) {
@@ -471,6 +473,39 @@ export default function ManagerDashboard() {
           if (empId) {
             const employee = activeEmployees.find(e => e.id === empId);
             const times = calculateShiftTimes(shiftType, employee.contract_type);
+            
+            // בדוק חריגות
+            const constraint = constraints.find(c => c.employee_id === empId && c.date === dateStr);
+            if (constraint && constraint.unavailable) {
+              alerts.push({
+                type: 'warning',
+                employeeId: empId,
+                employeeName: employee.full_name,
+                date: dateStr,
+                shiftType: shiftType,
+                message: `${employee.full_name} שובץ למשמרת ${shiftType} ב-${dateStr} למרות שסומן כלא זמין`,
+                reason: constraint.notes || 'לא זמין'
+              });
+            }
+
+            // בדוק חופשות מאושרות
+            const vacation = vacationRequests.find(v => 
+              v.employee_id === empId && 
+              v.status === 'אושר' &&
+              dateStr >= v.start_date && 
+              dateStr <= v.end_date
+            );
+            if (vacation) {
+              alerts.push({
+                type: 'error',
+                employeeId: empId,
+                employeeName: employee.full_name,
+                date: dateStr,
+                shiftType: shiftType,
+                message: `${employee.full_name} שובץ למשמרת ${shiftType} ב-${dateStr} למרות שיש לו ${vacation.type} מאושרת`,
+                reason: `${vacation.type} מאושרת`
+              });
+            }
             
             newShifts.push({
               date: dateStr,
@@ -513,8 +548,31 @@ export default function ManagerDashboard() {
       const assignedCount = newShifts.filter(s => s.assigned_employee_id).length;
       toast({
         title: 'הסקיצה נוצרה',
-        description: `${assignedCount} משמרות שובצו`,
+        description: `${assignedCount} משמרות שובצו${alerts.length > 0 ? ` • ${alerts.length} התראות` : ''}`,
       });
+
+      // עדכן התראות
+      setScheduleAlerts(alerts);
+
+      // שלח מיילים לעובדים עם חריגות
+      const uniqueEmployees = [...new Set(alerts.map(a => a.employeeId))];
+      for (const empId of uniqueEmployees) {
+        const employee = employees.find(e => e.id === empId);
+        if (employee?.user_id) {
+          const user = await base44.entities.User.list();
+          const empUser = user.find(u => u.id === employee.user_id);
+          if (empUser?.email) {
+            const empAlerts = alerts.filter(a => a.employeeId === empId);
+            const alertsText = empAlerts.map(a => `• ${a.message}`).join('\n');
+            
+            await base44.integrations.Core.SendEmail({
+              to: empUser.email,
+              subject: 'התראה: חריגה בסידור משמרות',
+              body: `שלום ${employee.full_name},\n\nזוהו החריגות הבאות בסידור המשמרות החדש:\n\n${alertsText}\n\nאנא פנה למנהל לבירור.\n\nבברכה,\nמערכת ניהול משמרות`
+            });
+          }
+        }
+      }
     } catch (error) {
       console.error('שגיאה ביצירת סידור:', error);
     } finally {
@@ -720,6 +778,42 @@ export default function ManagerDashboard() {
               <Button variant="ghost" size="sm" onClick={() => { setFilterEmployee('all'); setFilterShiftType('all'); }}>
                 נקה סינון
               </Button>
+            </div>
+          </div>
+        )}
+
+        {scheduleAlerts.length > 0 && (
+          <div className="bg-white rounded-lg shadow-md mb-4">
+            <div className="p-4 border-b flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-amber-500" />
+                <h3 className="font-bold">התראות סידור משמרות ({scheduleAlerts.length})</h3>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setScheduleAlerts([])}>
+                סגור
+              </Button>
+            </div>
+            <div className="p-4 space-y-2 max-h-60 overflow-y-auto">
+              {scheduleAlerts.map((alert, idx) => (
+                <div 
+                  key={idx} 
+                  className={`p-3 rounded-lg border-r-4 ${
+                    alert.type === 'error' ? 'bg-red-50 border-red-500' : 'bg-amber-50 border-amber-500'
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="font-medium text-sm">{alert.message}</div>
+                      <div className="text-xs text-gray-600 mt-1">
+                        סיבה: {alert.reason}
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="text-xs">
+                      {format(new Date(alert.date), 'dd/MM/yyyy')}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}

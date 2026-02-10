@@ -203,7 +203,7 @@ export default function ManagerDashboard() {
   const generateSchedule = async () => {
     setGenerating(true);
     try {
-      for (const shift of shifts) {
+      for (const shift of allShifts) {
         await deleteShiftMutation.mutateAsync(shift.id);
       }
 
@@ -211,150 +211,127 @@ export default function ManagerDashboard() {
       const monthEnd = endOfMonth(new Date(year, month - 1));
       const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
-      const newShifts = [];
       const activeEmployees = employees.filter(e => e.active);
-      const employeeWeeklyShifts = {};
-      const employeeMonthlyFridays = {};
-      const employeeLastThursdayLong = {};
-      const employeeLastFriday = {};
+      
+      // הכן נתונים ל-AI
+      const employeeData = activeEmployees.map(emp => ({
+        id: emp.id,
+        name: emp.full_name,
+        contract_type: emp.contract_type,
+      }));
 
-      for (const day of days) {
-        const dayOfWeek = getDay(day);
-        if (dayOfWeek === 6) continue;
+      const constraintData = constraints.map(c => ({
+        employee_id: c.employee_id,
+        date: c.date,
+        unavailable: c.unavailable,
+        preference: c.preference,
+        notes: c.notes,
+      }));
 
-        const dateStr = format(day, 'yyyy-MM-dd');
-        const isFriday = dayOfWeek === 5;
-        const isThursday = dayOfWeek === 4;
+      const datesData = days
+        .filter(d => getDay(d) !== 6)
+        .map(d => ({
+          date: format(d, 'yyyy-MM-dd'),
+          day_of_week: getDay(d),
+          is_friday: getDay(d) === 5,
+        }));
 
-        if (isFriday) {
-          // שישי - 2 עובדים
-          const availableForFriday = activeEmployees.filter(emp => {
-            const constraint = constraints.find(c => c.employee_id === emp.id && c.date === dateStr);
-            if (constraint?.unavailable) return false;
-            
-            const monthlyFridays = employeeMonthlyFridays[emp.id] || 0;
-            if (monthlyFridays >= 1) return false;
-            
-            const lastFriday = employeeLastFriday[emp.id];
-            if (lastFriday) {
-              const daysDiff = Math.floor((parseISO(dateStr) - parseISO(lastFriday)) / (1000 * 60 * 60 * 24));
-              if (daysDiff === 7) return false;
+      toast({ title: 'מייצר סידור משמרות מבוסס AI...', description: 'זה עשוי לקחת כמה שניות' });
+
+      // קריאה ל-AI
+      const aiResponse = await base44.integrations.Core.InvokeLLM({
+        prompt: `You are an expert shift scheduler. Generate an optimal monthly shift schedule.
+
+EMPLOYEES:
+${JSON.stringify(employeeData, null, 2)}
+
+CONSTRAINTS (unavailability and preferences):
+${JSON.stringify(constraintData, null, 2)}
+
+DATES TO SCHEDULE:
+${JSON.stringify(datesData, null, 2)}
+
+RULES:
+1. Each regular day (Sunday-Thursday) needs 2 shifts: "קצרה" (short) and "ארוכה" (long)
+2. Friday needs 2 shifts: "שישי קצר" (short Friday) and "שישי ארוך" (long Friday)
+3. No Saturday shifts
+4. Each employee maximum 2 shifts per week (Sunday-Saturday)
+5. Each employee maximum 1 Friday per month
+6. Avoid assigning Friday after Thursday long shift to same employee
+7. Respect unavailability (unavailable: true)
+8. Prefer assigning employees according to their preferences
+9. Balance workload evenly across all employees
+10. Minimize unassigned shifts
+
+Return a JSON array of shift assignments with this structure:
+[
+  {
+    "date": "2026-02-01",
+    "shift_type": "קצרה",
+    "employee_id": "emp123",
+    "reason": "Short explanation for assignment"
+  },
+  ...
+]
+
+Only return the JSON array, no other text.`,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            shifts: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  date: { type: "string" },
+                  shift_type: { type: "string" },
+                  employee_id: { type: "string" },
+                  reason: { type: "string" }
+                },
+                required: ["date", "shift_type"]
+              }
             }
-            
-            const yesterdayLong = employeeLastThursdayLong[emp.id];
-            if (yesterdayLong === format(new Date(day.getTime() - 86400000), 'yyyy-MM-dd')) return false;
-            
-            return true;
+          },
+          required: ["shifts"]
+        }
+      });
+
+      const aiShifts = aiResponse.shifts || [];
+      const newShifts = [];
+
+      for (const aiShift of aiShifts) {
+        const employee = activeEmployees.find(e => e.id === aiShift.employee_id);
+        
+        if (employee && aiShift.shift_type) {
+          const times = calculateShiftTimes(aiShift.shift_type, employee.contract_type);
+          newShifts.push({
+            date: aiShift.date,
+            shift_type: aiShift.shift_type,
+            assigned_employee_id: employee.id,
+            start_time: times.start,
+            end_time: times.end,
+            status: 'תקין',
           });
-
-          if (availableForFriday.length >= 2) {
-            const shortEmp = availableForFriday[0];
-            const longEmp = availableForFriday[1];
-
-            const shortTimes = calculateShiftTimes('שישי קצר', shortEmp.contract_type);
-            const longTimes = calculateShiftTimes('שישי ארוך', longEmp.contract_type);
-
-            newShifts.push({
-              date: dateStr,
-              shift_type: 'שישי קצר',
-              assigned_employee_id: shortEmp.id,
-              start_time: shortTimes.start,
-              end_time: shortTimes.end,
-              status: 'תקין',
-            });
-
-            newShifts.push({
-              date: dateStr,
-              shift_type: 'שישי ארוך',
-              assigned_employee_id: longEmp.id,
-              start_time: longTimes.start,
-              end_time: longTimes.end,
-              status: 'תקין',
-            });
-
-            employeeMonthlyFridays[shortEmp.id] = (employeeMonthlyFridays[shortEmp.id] || 0) + 1;
-            employeeMonthlyFridays[longEmp.id] = (employeeMonthlyFridays[longEmp.id] || 0) + 1;
-            employeeLastFriday[shortEmp.id] = dateStr;
-            employeeLastFriday[longEmp.id] = dateStr;
-          } else {
-            newShifts.push({
-              date: dateStr,
-              shift_type: 'שישי קצר',
-              status: 'בעיה',
-            });
-            newShifts.push({
-              date: dateStr,
-              shift_type: 'שישי ארוך',
-              status: 'בעיה',
-            });
-          }
-        } else {
-          // יום רגיל - קצרה וארוכה
-          const weekStart = startOfWeek(parseISO(dateStr), { weekStartsOn: 0 });
-          const weekKey = format(weekStart, 'yyyy-MM-dd');
-
-          const getAvailableEmployees = (preferredType) => {
-            return activeEmployees.filter(emp => {
-              const constraint = constraints.find(c => c.employee_id === emp.id && c.date === dateStr);
-              if (constraint?.unavailable) return false;
-              
-              const weekShifts = employeeWeeklyShifts[emp.id]?.[weekKey] || 0;
-              if (weekShifts >= 2) return false;
-              
-              if (constraint?.preference === `מעדיף ${preferredType}`) return true;
-              if (constraint?.preference && constraint.preference !== 'אין העדפה') return false;
-              
-              return true;
-            });
-          };
-
-          const shortAvailable = getAvailableEmployees('קצרה');
-          const longAvailable = getAvailableEmployees('ארוכה');
-
-          if (shortAvailable.length > 0) {
-            const emp = shortAvailable[0];
-            const times = calculateShiftTimes('קצרה', emp.contract_type);
-            newShifts.push({
-              date: dateStr,
-              shift_type: 'קצרה',
-              assigned_employee_id: emp.id,
-              start_time: times.start,
-              end_time: times.end,
-              status: 'תקין',
-            });
-            if (!employeeWeeklyShifts[emp.id]) employeeWeeklyShifts[emp.id] = {};
-            employeeWeeklyShifts[emp.id][weekKey] = (employeeWeeklyShifts[emp.id][weekKey] || 0) + 1;
-          } else {
-            newShifts.push({ date: dateStr, shift_type: 'קצרה', status: 'בעיה' });
-          }
-
-          if (longAvailable.length > 0) {
-            const emp = longAvailable[0];
-            const times = calculateShiftTimes('ארוכה', emp.contract_type);
-            newShifts.push({
-              date: dateStr,
-              shift_type: 'ארוכה',
-              assigned_employee_id: emp.id,
-              start_time: times.start,
-              end_time: times.end,
-              status: 'תקין',
-            });
-            if (!employeeWeeklyShifts[emp.id]) employeeWeeklyShifts[emp.id] = {};
-            employeeWeeklyShifts[emp.id][weekKey] = (employeeWeeklyShifts[emp.id][weekKey] || 0) + 1;
-            
-            if (isThursday) {
-              employeeLastThursdayLong[emp.id] = dateStr;
-            }
-          } else {
-            newShifts.push({ date: dateStr, shift_type: 'ארוכה', status: 'בעיה' });
-          }
+        } else if (aiShift.shift_type) {
+          // משמרת ללא עובד - סימון בעיה
+          newShifts.push({
+            date: aiShift.date,
+            shift_type: aiShift.shift_type,
+            status: 'בעיה',
+          });
         }
       }
 
       await base44.entities.Shift.bulkCreate(newShifts);
       queryClient.invalidateQueries(['shifts']);
       
-      toast({ title: `נוצרו ${newShifts.length} משמרות` });
+      const assignedCount = newShifts.filter(s => s.assigned_employee_id).length;
+      const problematicCount = newShifts.filter(s => s.status === 'בעיה').length;
+      
+      toast({ 
+        title: `נוצרו ${newShifts.length} משמרות`,
+        description: `${assignedCount} משובצות, ${problematicCount} ללא עובד זמין`
+      });
     } catch (error) {
       toast({ title: 'שגיאה', description: error.message, variant: 'destructive' });
     } finally {

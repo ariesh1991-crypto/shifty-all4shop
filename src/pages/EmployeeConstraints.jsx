@@ -272,12 +272,12 @@ function ConstraintForm({ selectedDate, existingConstraint, onSave, onDelete }) 
 
       <div>
         <Label>העדפת משמרת (אופציונלי)</Label>
-        <Select value={preference} onValueChange={setPreference}>
+        <Select value={preference || 'none'} onValueChange={(val) => setPreference(val === 'none' ? '' : val)}>
           <SelectTrigger>
-            <SelectValue />
+            <SelectValue placeholder="בחר העדפה..." />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={null}>אין העדפה</SelectItem>
+            <SelectItem value="none">ללא העדפה</SelectItem>
             <SelectItem value="מעדיף מסיים ב-17:30">מעדיף מסיים ב-17:30</SelectItem>
             <SelectItem value="מעדיף מסיים ב-19:00">מעדיף מסיים ב-19:00</SelectItem>
           </SelectContent>

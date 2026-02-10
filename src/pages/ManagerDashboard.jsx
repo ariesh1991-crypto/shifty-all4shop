@@ -318,14 +318,14 @@ ${JSON.stringify(datesData, null, 2)}
 === CRITICAL RULES - ABSOLUTE REQUIREMENTS ===
 
 SHIFT REQUIREMENTS:
-1. Each regular day (Sunday-Thursday) needs EXACTLY 2 shifts: one "קצרה" (short) and one "ארוכה" (long)
+1. Each regular day (Sunday-Thursday) needs EXACTLY 2 shifts: one "מסיים ב-17:30" and one "מסיים ב-19:00"
 2. Each Friday needs EXACTLY 2 shifts: one "שישי קצר" and one "שישי ארוך"
 3. NO Saturday shifts - ever
 4. EVERY shift MUST have an employee assigned (unassigned shifts = FAILURE)
 
 EMPLOYEE LIMITS (STRICTLY ENFORCE):
 5. MAXIMUM 2 shifts per employee per calendar week (Sunday-Saturday)
-   - This means: one קצרה + one ארוכה in the same week
+   - This means: one "מסיים ב-17:30" + one "מסיים ב-19:00" in the same week
    - Friday shifts COUNT toward this weekly limit
 6. MAXIMUM 1 Friday shift per employee per MONTH (either שישי קצר OR שישי ארוך, NOT both)
 7. NEVER assign the same employee to more than 2 shifts in any consecutive 7-day period
@@ -349,7 +349,7 @@ Before returning your schedule, verify EVERY item below:
 □ Every shift has an employee assigned (no null/empty employee_id)
 □ No employee has both shift types on the same day
 □ Workload is balanced - no employee has significantly more shifts than others
-□ No employee works Thursday ארוכה followed by Friday shift (if possible)
+□ No employee works Thursday "מסיים ב-19:00" followed by Friday shift (if possible)
 
 === OUTPUT FORMAT ===
 Return a JSON array with this EXACT structure:
@@ -363,11 +363,19 @@ Return a JSON array with this EXACT structure:
   ...
 ]
 
+EDGE CASE HANDLING:
+- If there are NOT ENOUGH employees to fill all shifts while following the rules:
+  * First, try to relax preference matching (assign employees to any available shift type)
+  * If still not enough: assign employees to 3 shifts per week ONLY IF ABSOLUTELY NECESSARY
+  * If still not enough: clearly mark which shifts could not be assigned (set employee_id to null and add reason)
+- Always prioritize rule compliance over having all shifts filled
+- Document your decisions in the "reason" field
+
 IMPORTANT: 
-- If you cannot assign a shift while following ALL rules, try alternative assignments
-- NEVER leave employee_id empty or null
+- NEVER leave employee_id empty or null unless you've exhausted all options
 - Double-check your work against the validation checklist before returning
 - Quality over speed - a correct schedule is the only acceptable output
+- If constraints make it impossible to create a perfect schedule, create the best possible one and document issues
 
 Only return the JSON array, no additional text.`,
         response_json_schema: {

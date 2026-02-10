@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { format, getMonth, getYear, getDay, startOfMonth, endOfMonth } from 'date-fns';
-import { ChevronLeft, ChevronRight, LogOut, Calendar } from 'lucide-react';
+import { format, getMonth, getYear, getDay } from 'date-fns';
+import { ChevronLeft, ChevronRight, LogOut, Calendar, Briefcase } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import NotificationBell from '../components/notifications/NotificationBell';
@@ -14,6 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import MonthCalendar from '../components/shifts/MonthCalendar';
 
 export default function EmployeeConstraints() {
@@ -22,6 +24,7 @@ export default function EmployeeConstraints() {
   const [selectedDate, setSelectedDate] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [rangeDialogOpen, setRangeDialogOpen] = useState(false);
+  const [vacationDialogOpen, setVacationDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -57,11 +60,21 @@ export default function EmployeeConstraints() {
     enabled: !!currentEmployee,
   });
 
+  const { data: vacationRequests = [] } = useQuery({
+    queryKey: ['vacationRequests', currentEmployee?.id],
+    queryFn: async () => {
+      if (!currentEmployee) return [];
+      const all = await base44.entities.VacationRequest.list('-created_date');
+      return all.filter(v => v.employee_id === currentEmployee.id);
+    },
+    enabled: !!currentEmployee,
+  });
+
   const createConstraintMutation = useMutation({
     mutationFn: (data) => base44.entities.Constraint.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries(['constraints']);
-      // אילוץ נשמר
+      toast({ title: 'אילוץ נשמר בהצלחה' });
       setDialogOpen(false);
     },
   });
@@ -70,7 +83,7 @@ export default function EmployeeConstraints() {
     mutationFn: ({ id, data }) => base44.entities.Constraint.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries(['constraints']);
-      // אילוץ עודכן
+      toast({ title: 'אילוץ עודכן בהצלחה' });
       setDialogOpen(false);
     },
   });
@@ -79,7 +92,16 @@ export default function EmployeeConstraints() {
     mutationFn: (id) => base44.entities.Constraint.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['constraints']);
-      // אילוץ נמחק
+      toast({ title: 'אילוץ נמחק בהצלחה' });
+    },
+  });
+
+  const createVacationRequestMutation = useMutation({
+    mutationFn: (data) => base44.entities.VacationRequest.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['vacationRequests']);
+      toast({ title: 'בקשת חופשה נשלחה למנהל' });
+      setVacationDialogOpen(false);
     },
   });
 
@@ -112,7 +134,14 @@ export default function EmployeeConstraints() {
     }
     
     setRangeDialogOpen(false);
-    // נשמרו ימים
+    toast({ title: `נשמרו ${dates.length} ימים` });
+  };
+
+  const handleVacationRequest = (data) => {
+    createVacationRequestMutation.mutate({
+      ...data,
+      employee_id: currentEmployee.id,
+    });
   };
 
   const renderDay = (date) => {
@@ -129,8 +158,8 @@ export default function EmployeeConstraints() {
         onClick={() => { setSelectedDate(dateStr); setDialogOpen(true); }}
         className={`p-3 border-2 rounded-lg cursor-pointer hover:shadow-md min-h-[80px] ${
           constraint?.unavailable ? 'bg-red-100 border-red-400' :
-          constraint?.preference === 'מעדיף מסיים ב-17:30' ? 'bg-blue-100 border-blue-400' :
-          constraint?.preference === 'מעדיף מסיים ב-19:00' ? 'bg-purple-100 border-purple-400' :
+          constraint?.preference === 'מעדיף לסיים ב-17:30' ? 'bg-blue-100 border-blue-400' :
+          constraint?.preference === 'מעדיף לסיים ב-19:00' ? 'bg-purple-100 border-purple-400' :
           'bg-white'
         }`}
       >
@@ -152,7 +181,6 @@ export default function EmployeeConstraints() {
   }
 
   if (!currentEmployee) {
-    // אם המשתמש הוא מנהל, תן לו להיכנס למערכת ללא חיבור לעובד
     if (currentUser?.role === 'admin') {
       window.location.href = '/ManagerDashboard';
       return <div className="min-h-screen flex items-center justify-center" dir="rtl">מעביר אותך ללוח בקרה...</div>;
@@ -172,12 +200,14 @@ export default function EmployeeConstraints() {
     );
   }
 
+  const pendingVacations = vacationRequests.filter(v => v.status === 'ממתין לאישור');
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6" dir="rtl">
       <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
           <h1 className="text-3xl font-bold">{currentEmployee.full_name} - אילוצים והעדפות</h1>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             {currentUser && <NotificationBell userId={currentUser.id} />}
             <Link to={createPageUrl('EmployeeShifts')}>
               <Button variant="outline">המשמרות שלי</Button>
@@ -185,9 +215,13 @@ export default function EmployeeConstraints() {
             <Link to={createPageUrl('EmployeeSwaps')}>
               <Button variant="outline">החלפת משמרות</Button>
             </Link>
-            <Button onClick={() => setRangeDialogOpen(true)} variant="default">
+            <Button onClick={() => setVacationDialogOpen(true)} variant="default">
+              <Briefcase className="w-4 h-4 ml-2" />
+              בקשת חופשה {pendingVacations.length > 0 && `(${pendingVacations.length})`}
+            </Button>
+            <Button onClick={() => setRangeDialogOpen(true)} variant="outline">
               <Calendar className="w-4 h-4 ml-2" />
-              בקשת חופשה/יציאה
+              סימון ימים מרובים
             </Button>
             <Button onClick={() => setCurrentDate(new Date(year, month - 2))} variant="outline">
               <ChevronRight className="w-5 h-5" />
@@ -202,6 +236,21 @@ export default function EmployeeConstraints() {
           </div>
         </div>
 
+        {pendingVacations.length > 0 && (
+          <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4 mb-6">
+            <h3 className="font-bold text-yellow-800 mb-2">
+              ⏳ יש לך {pendingVacations.length} בקשות חופשה ממתינות לאישור
+            </h3>
+            <div className="space-y-2">
+              {pendingVacations.map(v => (
+                <div key={v.id} className="text-sm text-yellow-700">
+                  • {v.type}: {format(new Date(v.start_date), 'dd/MM/yyyy')} - {format(new Date(v.end_date), 'dd/MM/yyyy')}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
           <h3 className="font-bold mb-2">מקרא:</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -211,16 +260,57 @@ export default function EmployeeConstraints() {
             </div>
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded bg-blue-100 border-2 border-blue-400"></div>
-              <span className="text-sm">מעדיף מסיים ב-17:30</span>
+              <span className="text-sm">מעדיף לסיים ב-17:30</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded bg-purple-100 border-2 border-purple-400"></div>
-              <span className="text-sm">מעדיף מסיים ב-19:00</span>
+              <span className="text-sm">מעדיף לסיים ב-19:00</span>
             </div>
           </div>
         </div>
 
         <MonthCalendar year={year} month={month} renderDay={renderDay} />
+
+        <div className="mt-6 bg-white rounded-lg shadow-md p-6">
+          <h3 className="font-bold text-lg mb-4">היסטוריית בקשות חופשה</h3>
+          {vacationRequests.length === 0 ? (
+            <p className="text-center text-gray-500 py-4">אין בקשות חופשה</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-right">תאריכים</TableHead>
+                  <TableHead className="text-right">סוג</TableHead>
+                  <TableHead className="text-right">סטטוס</TableHead>
+                  <TableHead className="text-right">הערות</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {vacationRequests.map(v => (
+                  <TableRow key={v.id}>
+                    <TableCell>
+                      {format(new Date(v.start_date), 'dd/MM/yyyy')} - {format(new Date(v.end_date), 'dd/MM/yyyy')}
+                    </TableCell>
+                    <TableCell>{v.type}</TableCell>
+                    <TableCell>
+                      <Badge variant={
+                        v.status === 'אושר' ? 'default' :
+                        v.status === 'נדחה' ? 'destructive' :
+                        'secondary'
+                      }>
+                        {v.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {v.manager_notes && <div className="text-sm text-gray-600">{v.manager_notes}</div>}
+                      {v.notes && <div className="text-xs text-gray-500 mt-1">{v.notes}</div>}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContent dir="rtl">
@@ -239,9 +329,24 @@ export default function EmployeeConstraints() {
         <Dialog open={rangeDialogOpen} onOpenChange={setRangeDialogOpen}>
           <DialogContent dir="rtl" className="max-w-lg">
             <DialogHeader>
-              <DialogTitle>בקשת חופשה או יציאה מרוכזת</DialogTitle>
+              <DialogTitle>סימון ימים מרובים</DialogTitle>
             </DialogHeader>
+            <p className="text-sm text-gray-600 mb-4">
+              סמן מספר ימים כלא זמין או עם העדפה
+            </p>
             <RangeConstraintForm onSave={handleSaveRangeConstraint} />
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={vacationDialogOpen} onOpenChange={setVacationDialogOpen}>
+          <DialogContent dir="rtl" className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>בקשת חופשה או היעדרות</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-gray-600 mb-4">
+              שלח בקשה למנהל לאישור חופשה, מחלה או היעדרות אחרת
+            </p>
+            <VacationRequestForm onSave={handleVacationRequest} />
           </DialogContent>
         </Dialog>
       </div>
@@ -254,8 +359,18 @@ function ConstraintForm({ selectedDate, existingConstraint, onSave, onDelete }) 
   const [preference, setPreference] = useState(existingConstraint?.preference || '');
   const [notes, setNotes] = useState(existingConstraint?.notes || '');
 
+  const date = new Date(selectedDate);
+  const dayOfWeek = getDay(date);
+  const isFriday = dayOfWeek === 5;
+
   return (
     <div className="space-y-4">
+      {isFriday && (
+        <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-3 text-sm text-blue-700">
+          📅 זהו יום שישי - שים לב שכל עובד יכול לעבוד רק שישי אחד בחודש
+        </div>
+      )}
+
       <div className="bg-red-50 border-2 border-red-400 rounded-lg p-4 mb-4">
         <div className="flex items-center gap-3">
           <Switch 
@@ -263,26 +378,34 @@ function ConstraintForm({ selectedDate, existingConstraint, onSave, onDelete }) 
             onCheckedChange={setUnavailable}
             className="data-[state=checked]:bg-red-600"
           />
-          <div>
+          <div className="flex-1">
             <Label className="text-lg font-bold text-red-700">לא זמין בתאריך זה</Label>
             <p className="text-sm text-red-600 mt-1">סמן אם אינך זמין לעבוד בתאריך זה</p>
+            {isFriday && unavailable && (
+              <p className="text-xs text-red-700 mt-2 font-bold">
+                ✓ לא תשובץ לשום משמרת שישי החודש
+              </p>
+            )}
           </div>
         </div>
       </div>
 
-      <div>
-        <Label>העדפת משמרת (אופציונלי)</Label>
-        <Select value={preference || 'none'} onValueChange={(val) => setPreference(val === 'none' ? '' : val)}>
-          <SelectTrigger>
-            <SelectValue placeholder="בחר העדפה..." />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">ללא העדפה</SelectItem>
-            <SelectItem value="מעדיף מסיים ב-17:30">מעדיף מסיים ב-17:30</SelectItem>
-            <SelectItem value="מעדיף מסיים ב-19:00">מעדיף מסיים ב-19:00</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      {!unavailable && (
+        <div>
+          <Label>העדפת משמרת (אופציונלי)</Label>
+          <p className="text-xs text-gray-500 mb-2">המערכת תנסה לכבד את ההעדפה אם אפשרי</p>
+          <Select value={preference || 'none'} onValueChange={(val) => setPreference(val === 'none' ? '' : val)}>
+            <SelectTrigger>
+              <SelectValue placeholder="בחר העדפה..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">ללא העדפה</SelectItem>
+              <SelectItem value="מעדיף לסיים ב-17:30">מעדיף לסיים ב-17:30</SelectItem>
+              <SelectItem value="מעדיף לסיים ב-19:00">מעדיף לסיים ב-19:00</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       <div>
         <Label>הערות</Label>
@@ -359,6 +482,78 @@ function RangeConstraintForm({ onSave }) {
 
       <div className="flex gap-3 justify-end">
         <Button type="submit">שמור טווח תאריכים</Button>
+      </div>
+    </form>
+  );
+}
+
+function VacationRequestForm({ onSave }) {
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [type, setType] = useState('חופשה');
+  const [notes, setNotes] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!startDate || !endDate) return;
+    onSave({ start_date: startDate, end_date: endDate, type, notes });
+    setStartDate('');
+    setEndDate('');
+    setNotes('');
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <Label>תאריך התחלה</Label>
+        <Input
+          type="date"
+          value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
+          required
+        />
+      </div>
+
+      <div>
+        <Label>תאריך סיום</Label>
+        <Input
+          type="date"
+          value={endDate}
+          onChange={(e) => setEndDate(e.target.value)}
+          required
+        />
+      </div>
+
+      <div>
+        <Label>סוג היעדרות</Label>
+        <Select value={type} onValueChange={setType}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="חופשה">חופשה</SelectItem>
+            <SelectItem value="מחלה">מחלה</SelectItem>
+            <SelectItem value="אחר">אחר</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <Label>הערות (אופציונלי)</Label>
+        <Textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="פרטים נוספים על הבקשה..."
+          rows={3}
+        />
+      </div>
+
+      <div className="bg-blue-50 border border-blue-300 rounded-lg p-3 text-sm text-blue-700">
+        💡 הבקשה תישלח למנהל לאישור. לאחר אישור, התאריכים ישמרו אוטומטית כלא זמין.
+      </div>
+
+      <div className="flex gap-3 justify-end">
+        <Button type="submit">שלח בקשה למנהל</Button>
       </div>
     </form>
   );

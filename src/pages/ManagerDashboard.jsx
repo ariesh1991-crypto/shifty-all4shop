@@ -351,6 +351,7 @@ export default function ManagerDashboard() {
         employeeStats[emp.id] = {
           employee: emp,
           weeklyShifts: {}, // { weekNum: count }
+          weeklyShiftTypes: {}, // { weekNum: [shift_types] }
           fridayCount: 0,
           totalShifts: 0,
         };
@@ -369,10 +370,11 @@ export default function ManagerDashboard() {
       };
 
       // פונקציה לבדוק אם עובד יכול לקבל משמרת
-      const canAssignShift = (empId, date, isFridayShift) => {
+      const canAssignShift = (empId, date, shiftType) => {
         const stats = employeeStats[empId];
         const weekNum = getWeekNum(date);
         const dateStr = format(date, 'yyyy-MM-dd');
+        const isFridayShift = shiftType.includes('שישי');
 
         // בדוק זמינות
         if (!isEmployeeAvailable(empId, dateStr)) return false;
@@ -384,6 +386,14 @@ export default function ManagerDashboard() {
         // בדוק מגבלת שישי (מקסימום 1 לחודש)
         if (isFridayShift && stats.fridayCount >= 1) return false;
 
+        // בדוק חוק חדש: משמרת שנייה בשבוע חייבת להיות מסוג שונה
+        if (!isFridayShift && weekShifts === 1) {
+          const weekTypes = stats.weeklyShiftTypes[weekNum] || [];
+          if (weekTypes.includes(shiftType)) {
+            return false; // כבר יש לו משמרת מהסוג הזה השבוע
+          }
+        }
+
         return true;
       };
 
@@ -394,18 +404,22 @@ export default function ManagerDashboard() {
         const isFridayShift = shiftType.includes('שישי');
 
         stats.weeklyShifts[weekNum] = (stats.weeklyShifts[weekNum] || 0) + 1;
+        
+        if (!stats.weeklyShiftTypes[weekNum]) {
+          stats.weeklyShiftTypes[weekNum] = [];
+        }
+        stats.weeklyShiftTypes[weekNum].push(shiftType);
+        
         stats.totalShifts += 1;
         if (isFridayShift) stats.fridayCount += 1;
       };
 
       // פונקציה לבחור עובד למשמרת (בחירה הוגנת)
       const selectEmployeeForShift = (date, shiftType, preferredType = null) => {
-        const isFridayShift = shiftType.includes('שישי');
-        
         // מיון לפי מספר משמרות (מי שיש לו פחות יקבל קודם)
         const sortedEmployees = activeEmployees
           .map(emp => ({ emp, stats: employeeStats[emp.id] }))
-          .filter(({ emp }) => canAssignShift(emp.id, date, isFridayShift))
+          .filter(({ emp }) => canAssignShift(emp.id, date, shiftType))
           .sort((a, b) => a.stats.totalShifts - b.stats.totalShifts);
 
         if (sortedEmployees.length === 0) return null;

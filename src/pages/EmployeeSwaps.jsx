@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { ArrowLeftRight, LogOut, ArrowRight } from 'lucide-react';
+import { ArrowLeftRight, LogOut, ArrowRight, Bell } from 'lucide-react';
+import NotificationBell from '../components/notifications/NotificationBell';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -22,10 +23,13 @@ export default function EmployeeSwaps() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const [currentUser, setCurrentUser] = useState(null);
+
   useEffect(() => {
     const loadEmployee = async () => {
       try {
         const user = await base44.auth.me();
+        setCurrentUser(user);
         const allEmployees = await base44.entities.Employee.list();
         const employee = allEmployees.find(emp => emp.user_id === user.id);
         setCurrentEmployee(employee);
@@ -60,7 +64,37 @@ export default function EmployeeSwaps() {
   });
 
   const createSwapMutation = useMutation({
-    mutationFn: (data) => base44.entities.SwapRequest.create(data),
+    mutationFn: async (data) => {
+      const swapRequest = await base44.entities.SwapRequest.create(data);
+      
+      // Notify target employee
+      const targetEmployee = employees.find(e => e.id === data.target_employee_id);
+      if (targetEmployee?.user_id) {
+        await base44.entities.Notification.create({
+          user_id: targetEmployee.user_id,
+          employee_id: targetEmployee.id,
+          type: 'swap_request_received',
+          title: 'בקשת החלפת משמרת',
+          message: `${currentEmployee.full_name} מבקש להחליף איתך משמרת`,
+          swap_request_id: swapRequest.id,
+        });
+      }
+      
+      // Notify all managers
+      const allUsers = await base44.entities.User.list();
+      const managers = allUsers.filter(u => u.role === 'admin');
+      for (const manager of managers) {
+        await base44.entities.Notification.create({
+          user_id: manager.id,
+          type: 'swap_request_received',
+          title: 'בקשת החלפת משמרת חדשה',
+          message: `${currentEmployee.full_name} מבקש להחליף משמרת`,
+          swap_request_id: swapRequest.id,
+        });
+      }
+      
+      return swapRequest;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries(['swapRequests']);
       toast({ title: 'בקשת החלפה נשלחה' });
@@ -95,6 +129,7 @@ export default function EmployeeSwaps() {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">החלפת משמרות</h1>
           <div className="flex gap-3">
+            {currentUser && <NotificationBell userId={currentUser.id} />}
             <Link to={createPageUrl('EmployeeConstraints')}>
               <Button variant="outline">
                 <ArrowRight className="w-4 h-4 ml-2" />

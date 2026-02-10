@@ -3,6 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, getMonth, getYear, getDay, startOfMonth, endOfMonth } from 'date-fns';
 import { ChevronLeft, ChevronRight, LogOut, Calendar } from 'lucide-react';
+import NotificationBell from '../components/notifications/NotificationBell';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -27,10 +28,13 @@ export default function EmployeeConstraints() {
   const month = getMonth(currentDate) + 1;
   const monthKey = `${year}-${String(month).padStart(2, '0')}`;
 
+  const [currentUser, setCurrentUser] = useState(null);
+
   useEffect(() => {
     const loadEmployee = async () => {
       try {
         const user = await base44.auth.me();
+        setCurrentUser(user);
         const allEmployees = await base44.entities.Employee.list();
         const employee = allEmployees.find(emp => emp.user_id === user.id);
         setCurrentEmployee(employee);
@@ -166,6 +170,7 @@ export default function EmployeeConstraints() {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">{currentEmployee.full_name} - אילוצים והעדפות</h1>
           <div className="flex gap-2">
+            {currentUser && <NotificationBell userId={currentUser.id} />}
             <Link to={createPageUrl('EmployeeSwaps')}>
               <Button variant="outline">החלפת משמרות</Button>
             </Link>

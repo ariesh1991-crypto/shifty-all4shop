@@ -3,6 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, getMonth, getYear, getDay, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, parseISO } from 'date-fns';
 import { ChevronLeft, ChevronRight, Sparkles, Users, LogOut, AlertCircle, ArrowLeftRight } from 'lucide-react';
+import NotificationBell from '../components/notifications/NotificationBell';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/use-toast';
@@ -51,8 +52,17 @@ export default function ManagerDashboard() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [swapDialogOpen, setSwapDialogOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  React.useEffect(() => {
+    const loadUser = async () => {
+      const user = await base44.auth.me();
+      setCurrentUser(user);
+    };
+    loadUser();
+  }, []);
 
   const year = getYear(currentDate);
   const month = getMonth(currentDate) + 1;
@@ -122,6 +132,32 @@ export default function ManagerDashboard() {
       id: swapRequest.id,
       data: { status: 'אושר' }
     });
+
+    // Notify requesting employee
+    const requestingEmployee = employees.find(e => e.id === swapRequest.requesting_employee_id);
+    if (requestingEmployee?.user_id) {
+      await base44.entities.Notification.create({
+        user_id: requestingEmployee.user_id,
+        employee_id: requestingEmployee.id,
+        type: 'swap_approved',
+        title: 'בקשת החלפה אושרה',
+        message: 'בקשת ההחלפה שלך אושרה על ידי המנהל',
+        swap_request_id: swapRequest.id,
+      });
+    }
+
+    // Notify target employee about shift change
+    const targetEmployee = employees.find(e => e.id === swapRequest.target_employee_id);
+    if (targetEmployee?.user_id) {
+      await base44.entities.Notification.create({
+        user_id: targetEmployee.user_id,
+        employee_id: targetEmployee.id,
+        type: 'shift_changed',
+        title: 'המשמרת שלך שונתה',
+        message: `שובצת למשמרת חדשה לאחר אישור החלפה`,
+        swap_request_id: swapRequest.id,
+      });
+    }
   };
 
   const handleRejectSwap = async (swapRequest, managerNotes) => {
@@ -129,6 +165,19 @@ export default function ManagerDashboard() {
       id: swapRequest.id,
       data: { status: 'נדחה', manager_notes: managerNotes }
     });
+
+    // Notify requesting employee
+    const requestingEmployee = employees.find(e => e.id === swapRequest.requesting_employee_id);
+    if (requestingEmployee?.user_id) {
+      await base44.entities.Notification.create({
+        user_id: requestingEmployee.user_id,
+        employee_id: requestingEmployee.id,
+        type: 'swap_rejected',
+        title: 'בקשת החלפה נדחתה',
+        message: managerNotes || 'בקשת ההחלפה שלך נדחתה על ידי המנהל',
+        swap_request_id: swapRequest.id,
+      });
+    }
   };
 
   const generateSchedule = async () => {
@@ -343,6 +392,7 @@ export default function ManagerDashboard() {
           <h1 className="text-3xl font-bold">לוח משמרות</h1>
           
           <div className="flex gap-3">
+            {currentUser && <NotificationBell userId={currentUser.id} />}
             <Link to={createPageUrl('ManageEmployees')}>
               <Button variant="outline">
                 <Users className="w-4 h-4 ml-2" />

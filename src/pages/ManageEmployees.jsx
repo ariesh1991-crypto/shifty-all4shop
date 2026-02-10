@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Pencil, Trash2, Plus, ArrowRight, UserPlus } from 'lucide-react';
+import { Pencil, Trash2, ArrowRight, UserPlus, Search, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
@@ -19,6 +19,8 @@ export default function ManageEmployees() {
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [editingEmployee, setEditingEmployee] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterActive, setFilterActive] = useState('all');
   const [formData, setFormData] = useState({
     full_name: '',
     active: true,
@@ -112,22 +114,48 @@ export default function ManageEmployees() {
     }
   };
 
+  const filteredEmployees = employees.filter((employee) => {
+    const matchesSearch = employee.full_name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesActive = filterActive === 'all' || 
+      (filterActive === 'active' && employee.active) || 
+      (filterActive === 'inactive' && !employee.active);
+    return matchesSearch && matchesActive;
+  });
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-6" dir="rtl">
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold text-gray-800">ניהול עובדים</h1>
-          <div className="flex gap-3">
-            <Button onClick={() => { resetForm(); setDialogOpen(true); }}>
-              <Plus className="w-4 h-4 ml-2" />
-              הוסף עובד
+          <Link to={createPageUrl('ManagerDashboard')}>
+            <Button variant="outline">
+              <ArrowRight className="w-4 h-4 ml-2" />
+              חזרה ללוח משמרות
             </Button>
-            <Link to={createPageUrl('ManagerDashboard')}>
-              <Button variant="outline">
-                <ArrowRight className="w-4 h-4 ml-2" />
-                חזרה ללוח משמרות
-              </Button>
-            </Link>
+          </Link>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-md p-4 mb-4">
+          <div className="flex gap-4 items-center">
+            <div className="flex-1 relative">
+              <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <Input
+                placeholder="חיפוש עובד לפי שם..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pr-10"
+              />
+            </div>
+            <Select value={filterActive} onValueChange={setFilterActive}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">הכל</SelectItem>
+                <SelectItem value="active">פעילים</SelectItem>
+                <SelectItem value="inactive">לא פעילים</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -144,7 +172,7 @@ export default function ManageEmployees() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {employees.map((employee) => {
+              {filteredEmployees.map((employee) => {
                 const linkedUser = users.find(u => u.id === employee.user_id);
                 return (
                   <TableRow key={employee.id}>
@@ -152,7 +180,10 @@ export default function ManageEmployees() {
                     <TableCell>{employee.active ? '✓' : '✗'}</TableCell>
                     <TableCell>
                       {linkedUser ? (
-                        <span className="text-green-600">{linkedUser.email}</span>
+                        <div className="flex items-center gap-2 text-green-600">
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>{linkedUser.email}</span>
+                        </div>
                       ) : (
                         <span className="text-gray-400">לא מחובר</span>
                       )}

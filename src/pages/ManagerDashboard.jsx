@@ -327,11 +327,11 @@ export default function ManagerDashboard() {
       // מחק משמרות קיימות
       const shiftsToDelete = allShifts.filter(s => s.date && s.date.startsWith(monthKey));
       if (shiftsToDelete.length > 0) {
-        const batchSize = 3;
+        const batchSize = 2;
         for (let i = 0; i < shiftsToDelete.length; i += batchSize) {
           const batch = shiftsToDelete.slice(i, i + batchSize);
           await Promise.all(batch.map(shift => deleteShiftMutation.mutateAsync(shift.id)));
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 1000));
         }
       }
 
@@ -498,12 +498,12 @@ export default function ManagerDashboard() {
       }
 
       // צור משמרות ב-batches כדי לא לעבור rate limit
-      const createBatchSize = 10;
+      const createBatchSize = 5;
       for (let i = 0; i < newShifts.length; i += createBatchSize) {
         const batch = newShifts.slice(i, i + createBatchSize);
         await base44.entities.Shift.bulkCreate(batch);
         if (i + createBatchSize < newShifts.length) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 1500));
         }
       }
       
@@ -675,16 +675,15 @@ export default function ManagerDashboard() {
                 if (confirm('האם אתה בטוח שברצונך למחוק את כל המשמרות לחודש הנוכחי?')) {
                   try {
                     const shiftsToDelete = allShifts;
-                    const batchSize = 3;
+                    const batchSize = 2;
                     for (let i = 0; i < shiftsToDelete.length; i += batchSize) {
                       const batch = shiftsToDelete.slice(i, i + batchSize);
                       await Promise.all(batch.map(shift => deleteShiftMutation.mutateAsync(shift.id)));
-                      await new Promise(resolve => setTimeout(resolve, 500));
+                      await new Promise(resolve => setTimeout(resolve, 1000));
                     }
                     toast({ title: 'כל המשמרות נמחקו' });
                   } catch (error) {
                     console.error('Error deleting shifts:', error);
-                    toast({ title: 'שגיאה במחיקת משמרות', description: error.message, variant: 'destructive' });
                   }
                 }
               }}

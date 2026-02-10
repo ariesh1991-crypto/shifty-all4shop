@@ -251,17 +251,25 @@ ${JSON.stringify(constraintData, null, 2)}
 DATES TO SCHEDULE:
 ${JSON.stringify(datesData, null, 2)}
 
-RULES:
-1. Each regular day (Sunday-Thursday) needs 2 shifts: "קצרה" (short) and "ארוכה" (long)
-2. Friday needs 2 shifts: "שישי קצר" (short Friday) and "שישי ארוך" (long Friday)
+CRITICAL RULES (MUST BE FOLLOWED STRICTLY):
+1. Each regular day (Sunday-Thursday) needs EXACTLY 2 shifts: one "קצרה" (short) and one "ארוכה" (long)
+2. Friday needs EXACTLY 2 shifts: one "שישי קצר" (short Friday) and one "שישי ארוך" (long Friday)
 3. No Saturday shifts
-4. Each employee maximum 2 shifts per week (Sunday-Saturday)
-5. Each employee maximum 1 Friday per month
-6. Avoid assigning Friday after Thursday long shift to same employee
-7. Respect unavailability (unavailable: true)
-8. Prefer assigning employees according to their preferences
-9. Balance workload evenly across all employees
-10. Minimize unassigned shifts
+4. MAXIMUM 2 shifts per employee per week (Sunday-Saturday): one short shift + one long shift. Friday shifts count as part of this limit.
+5. Each employee gets MAXIMUM 1 Friday shift per month (either שישי קצר OR שישי ארוך, not both)
+6. NEVER assign the same employee to more than 2 shifts in any 7-day period
+7. Avoid assigning Friday shift after Thursday long shift to the same employee
+8. NEVER assign an employee who is unavailable (unavailable: true)
+9. Prefer assigning employees according to their preferences when possible
+10. Balance workload evenly across all employees throughout the month
+11. Each shift MUST have an employee assigned - minimize unassigned shifts
+
+VALIDATION CHECKLIST (check before returning):
+- No employee appears more than twice in any single week
+- No employee has both short and long shifts on the same day
+- No employee has more than one Friday shift in the month
+- All unavailable employees are excluded from their unavailable dates
+- Every date has both required shift types assigned
 
 Return a JSON array of shift assignments with this structure:
 [

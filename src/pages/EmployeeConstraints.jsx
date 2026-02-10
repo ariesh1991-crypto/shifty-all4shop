@@ -131,6 +131,7 @@ export default function EmployeeConstraints() {
           constraint?.unavailable ? 'bg-red-100 border-red-400' :
           constraint?.preference === 'מעדיף קצרה' ? 'bg-blue-100 border-blue-400' :
           constraint?.preference === 'מעדיף ארוכה' ? 'bg-purple-100 border-purple-400' :
+          constraint?.preference === 'אין העדפה' ? 'bg-gray-100 border-gray-400' :
           'bg-white'
         }`}
       >
@@ -138,7 +139,7 @@ export default function EmployeeConstraints() {
         {constraint && (
           <div className="text-xs text-center space-y-1">
             {constraint.unavailable && <div className="font-bold text-red-600">לא זמין</div>}
-            {constraint.preference !== 'אין העדפה' && (
+            {constraint.preference && (
               <div className="text-gray-700">{constraint.preference}</div>
             )}
           </div>
@@ -179,6 +180,9 @@ export default function EmployeeConstraints() {
           <h1 className="text-3xl font-bold">{currentEmployee.full_name} - אילוצים והעדפות</h1>
           <div className="flex gap-2">
             {currentUser && <NotificationBell userId={currentUser.id} />}
+            <Link to={createPageUrl('EmployeeShifts')}>
+              <Button variant="outline">המשמרות שלי</Button>
+            </Link>
             <Link to={createPageUrl('EmployeeSwaps')}>
               <Button variant="outline">החלפת משמרות</Button>
             </Link>
@@ -201,7 +205,7 @@ export default function EmployeeConstraints() {
 
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
           <h3 className="font-bold mb-2">מקרא:</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded bg-red-100 border-2 border-red-400"></div>
               <span className="text-sm">לא זמין</span>
@@ -213,6 +217,10 @@ export default function EmployeeConstraints() {
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded bg-purple-100 border-2 border-purple-400"></div>
               <span className="text-sm">מעדיף ארוכה</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded bg-gray-100 border-2 border-gray-400"></div>
+              <span className="text-sm">אין העדפה</span>
             </div>
           </div>
         </div>

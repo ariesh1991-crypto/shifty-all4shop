@@ -52,6 +52,7 @@ import EmployeeSwaps from './pages/EmployeeSwaps';
 import Home from './pages/Home';
 import ManageEmployees from './pages/ManageEmployees';
 import ManagerDashboard from './pages/ManagerDashboard';
+import EmployeeShifts from './pages/EmployeeShifts';
 
 
 export const PAGES = {
@@ -60,6 +61,7 @@ export const PAGES = {
     "Home": Home,
     "ManageEmployees": ManageEmployees,
     "ManagerDashboard": ManagerDashboard,
+    "EmployeeShifts": EmployeeShifts,
 }
 
 export const pagesConfig = {

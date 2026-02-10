@@ -53,13 +53,13 @@ export default function ManageEmployees() {
         try {
           await base44.entities.Employee.update(newEmployee.id, { user_id: selectedUser.id });
           await queryClient.invalidateQueries(['employees']);
-          toast({ title: 'עובד נוסף וחובר למשתמש בהצלחה' });
+          // עובד נוסף וחובר
           setSelectedUser(null);
         } catch (error) {
-          toast({ title: 'עובד נוסף אך הקישור למשתמש נכשל', variant: 'destructive' });
+          console.error('עובד נוסף אך הקישור למשתמש נכשל');
         }
       } else {
-        toast({ title: 'עובד נוסף בהצלחה' });
+        // עובד נוסף
       }
       
       setDialogOpen(false);
@@ -89,7 +89,7 @@ export default function ManageEmployees() {
     mutationFn: ({ employeeId, userId }) => base44.entities.Employee.update(employeeId, { user_id: userId }),
     onSuccess: () => {
       queryClient.invalidateQueries(['employees']);
-      toast({ title: 'משתמש חובר לעובד בהצלחה' });
+      // משתמש חובר
       setLinkDialogOpen(false);
       setQuickLinkDialogOpen(false);
     },

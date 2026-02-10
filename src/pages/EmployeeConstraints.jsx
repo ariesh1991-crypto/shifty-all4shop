@@ -61,7 +61,7 @@ export default function EmployeeConstraints() {
     mutationFn: (data) => base44.entities.Constraint.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries(['constraints']);
-      toast({ title: 'אילוץ נשמר' });
+      // אילוץ נשמר
       setDialogOpen(false);
     },
   });
@@ -70,7 +70,7 @@ export default function EmployeeConstraints() {
     mutationFn: ({ id, data }) => base44.entities.Constraint.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries(['constraints']);
-      toast({ title: 'אילוץ עודכן' });
+      // אילוץ עודכן
       setDialogOpen(false);
     },
   });
@@ -112,7 +112,7 @@ export default function EmployeeConstraints() {
     }
     
     setRangeDialogOpen(false);
-    toast({ title: `נשמרו ${dates.length} ימים` });
+    // נשמרו ימים
   };
 
   const renderDay = (date) => {

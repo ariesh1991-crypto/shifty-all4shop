@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { format, getMonth, getYear, getDay, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, parseISO } from 'date-fns';
-import { ChevronLeft, ChevronRight, Sparkles, Users, LogOut, AlertCircle, ArrowLeftRight, Plus, Filter } from 'lucide-react';
+import { format, getMonth, getYear, getDay, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, parseISO } from 'date-fns';
+import { ChevronLeft, ChevronRight, Sparkles, Users, LogOut, AlertCircle, ArrowLeftRight, Plus, Filter, Briefcase } from 'lucide-react';
 import NotificationBell from '../components/notifications/NotificationBell';
+import VacationManager from '../components/vacations/VacationManager';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/use-toast';
@@ -67,6 +68,7 @@ export default function ManagerDashboard() {
   const [selectedDate, setSelectedDate] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [swapDialogOpen, setSwapDialogOpen] = useState(false);
+  const [vacationDialogOpen, setVacationDialogOpen] = useState(false);
   const [recurringDialogOpen, setRecurringDialogOpen] = useState(false);
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -101,6 +103,13 @@ export default function ManagerDashboard() {
     },
   });
 
+  const { data: vacationRequests = [] } = useQuery({
+    queryKey: ['vacationRequests'],
+    queryFn: () => base44.entities.VacationRequest.list('-created_date'),
+  });
+
+  const pendingVacations = vacationRequests.filter(v => v.status === 'ממתין לאישור');
+
   const approveScheduleMutation = useMutation({
     mutationFn: async () => {
       const drafts = allShifts.filter(s => s.schedule_status === 'טיוטה');
@@ -122,7 +131,6 @@ export default function ManagerDashboard() {
 
   const createShiftMutation = useMutation({
     mutationFn: (data) => {
-      // וולידציה לפני יצירה
       const date = new Date(data.date);
       const dayOfWeek = getDay(date);
       if (!validateShiftForDay(data.shift_type, dayOfWeek)) {
@@ -171,6 +179,20 @@ export default function ManagerDashboard() {
     mutationFn: ({ id, data }) => base44.entities.SwapRequest.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries(['swapRequests']);
+    },
+  });
+
+  const updateVacationMutation = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.VacationRequest.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['vacationRequests']);
+    },
+  });
+
+  const createConstraintMutation = useMutation({
+    mutationFn: (data) => base44.entities.Constraint.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['constraints']);
     },
   });
 
@@ -232,10 +254,70 @@ export default function ManagerDashboard() {
     }
   };
 
+  const handleApproveVacation = async (vacationRequest) => {
+    // עדכן בקשה לאושר
+    await updateVacationMutation.mutateAsync({
+      id: vacationRequest.id,
+      data: { status: 'אושר' }
+    });
+
+    // צור אילוצים אוטומטית לכל התאריכים
+    const start = new Date(vacationRequest.start_date);
+    const end = new Date(vacationRequest.end_date);
+    const dates = eachDayOfInterval({ start, end });
+
+    for (const date of dates) {
+      const dateStr = format(date, 'yyyy-MM-dd');
+      const existing = constraints.find(c => c.employee_id === vacationRequest.employee_id && c.date === dateStr);
+      
+      if (!existing) {
+        await createConstraintMutation.mutateAsync({
+          employee_id: vacationRequest.employee_id,
+          date: dateStr,
+          unavailable: true,
+          notes: `${vacationRequest.type} מאושרת`
+        });
+      }
+    }
+
+    // שלח התראה לעובד
+    const employee = employees.find(e => e.id === vacationRequest.employee_id);
+    if (employee?.user_id) {
+      await base44.entities.Notification.create({
+        user_id: employee.user_id,
+        employee_id: employee.id,
+        type: 'swap_approved',
+        title: 'בקשת החופשה אושרה',
+        message: `בקשת ה${vacationRequest.type} שלך לתאריכים ${format(start, 'dd/MM')} - ${format(end, 'dd/MM')} אושרה`,
+      });
+    }
+
+    toast({ title: 'בקשת החופשה אושרה והתאריכים סומנו כלא זמין' });
+  };
+
+  const handleRejectVacation = async (vacationRequest, managerNotes) => {
+    await updateVacationMutation.mutateAsync({
+      id: vacationRequest.id,
+      data: { status: 'נדחה', manager_notes: managerNotes }
+    });
+
+    const employee = employees.find(e => e.id === vacationRequest.employee_id);
+    if (employee?.user_id) {
+      await base44.entities.Notification.create({
+        user_id: employee.user_id,
+        employee_id: employee.id,
+        type: 'swap_rejected',
+        title: 'בקשת החופשה נדחתה',
+        message: managerNotes || 'בקשת החופשה שלך נדחתה על ידי המנהל',
+      });
+    }
+
+    toast({ title: 'בקשת החופשה נדחתה' });
+  };
+
   const generateSchedule = async () => {
     setGenerating(true);
     try {
-      // מחיקה של משמרות קיימות בבאצ'ים קטנים
       const shiftsToDelete = allShifts.filter(s => s.date && s.date.startsWith(monthKey));
       if (shiftsToDelete.length > 0) {
         const batchSize = 5;
@@ -264,7 +346,7 @@ export default function ManagerDashboard() {
         employee_id: c.employee_id,
         date: c.date,
         unavailable: c.unavailable,
-        preference: c.preference === 'none' ? null : c.preference,
+        preference: c.preference,
         notes: c.notes,
       }));
 
@@ -277,60 +359,66 @@ export default function ManagerDashboard() {
         }));
 
       const aiResponse = await base44.integrations.Core.InvokeLLM({
-        prompt: `You are an EXPERT shift scheduler. Your goal is to create a compliant schedule.
+        prompt: `You are an EXPERT shift scheduler. Create a compliant schedule following ALL rules STRICTLY.
 
 EMPLOYEES (${activeEmployees.length} active):
 ${JSON.stringify(employeeData, null, 2)}
 
-CONSTRAINTS (unavailability and preferences):
+CONSTRAINTS (STRICT - unavailability MUST be respected):
 ${JSON.stringify(constraintData, null, 2)}
 
 DATES TO SCHEDULE (${datesData.length} days):
 ${JSON.stringify(datesData, null, 2)}
 
-=== CRITICAL FRIDAY RULE - HARD GUARDRAIL ===
-**FRIDAY (day_of_week=5) can ONLY have these shift types:**
-- "שישי קצר" (08:30-12:00)
-- "שישי ארוך" (08:00-14:00)
+=== CRITICAL FRIDAY RULE - ABSOLUTE GUARDRAIL ===
+**IF day_of_week == 5 (Friday), you can ONLY assign:**
+- "שישי קצר"
+- "שישי ארוך"
 
-**NEVER assign these shift types on Friday:**
+**NEVER assign on Friday:**
 - "מסיים ב-17:30"
 - "מסיים ב-19:00"
 
-**Weekdays (Sunday-Thursday) can ONLY have:**
+**IF day_of_week != 5 (weekday), you can ONLY assign:**
 - "מסיים ב-17:30"
 - "מסיים ב-19:00"
+
+**NEVER assign on weekdays:**
+- "שישי קצר"
+- "שישי ארוך"
 
 === SHIFT REQUIREMENTS ===
-1. Sunday-Thursday: EXACTLY 2 shifts per day - one "מסיים ב-17:30" and one "מסיים ב-19:00"
-2. Friday: EXACTLY 2 shifts - one "שישי קצר" and one "שישי ארוך"
-3. NO Saturday shifts
+1. Sunday-Thursday: EXACTLY 2 shifts per day - "מסיים ב-17:30" and "מסיים ב-19:00"
+2. Friday: EXACTLY 2 shifts - "שישי קצר" and "שישי ארוך"
 
-=== EMPLOYEE LIMITS ===
-4. MAX 2 shifts per employee per calendar week (Sun-Sat)
-5. MAX 1 Friday shift per employee per MONTH
-6. NEVER assign employee marked as unavailable on a date
+=== EMPLOYEE LIMITS - STRICTLY ENFORCE ===
+3. MAX 2 shifts per employee per calendar week (Sun-Sat)
+4. MAX 1 Friday shift per employee per ENTIRE MONTH (not per week!)
+5. **ABSOLUTELY NEVER** assign employee if unavailable=true on that date
+6. If employee has Friday unavailability constraint, they CANNOT work ANY Friday that month
 7. PREFER employees with matching preferences when available
 
-=== EDGE CASE HANDLING ===
-If not enough employees are available while following rules:
-- First: Relax preference matching (assign any available employee)
-- If still not enough: Set employee_id to null and explain in "reason" field
-- Suggest to manager: Consider offering incentives, overtime, or asking employees to be flexible
+=== MANDATORY CHECKS BEFORE ASSIGNING ===
+For EVERY shift assignment, verify:
+□ Employee is NOT marked unavailable on this date
+□ Employee has NOT exceeded weekly limit (2 shifts/week)
+□ If Friday shift: employee has NOT worked another Friday this month
+□ Shift type matches day of week (Friday shifts on Friday ONLY)
 
-Output format:
+=== EDGE CASE HANDLING ===
+If not enough employees while following rules:
+1. Relax preference matching
+2. If still not enough: Set employee_id to null with detailed "reason"
+3. In reason, suggest: "שקול להציע תוספת שכר, שעות נוספות, או לבקש מעובדים גמישות"
+
+**CRITICAL**: If an employee is marked unavailable, DO NOT assign them. No exceptions.
+
+Return ONLY JSON:
 {
   "shifts": [
-    {
-      "date": "2026-02-01",
-      "shift_type": "מסיים ב-17:30",
-      "employee_id": "emp_id" or null,
-      "reason": "explanation if null or edge case"
-    }
+    {"date": "2026-02-01", "shift_type": "מסיים ב-17:30", "employee_id": "id" or null, "reason": "if null"}
   ]
-}
-
-Return ONLY the JSON, no extra text.`,
+}`,
         response_json_schema: {
           type: "object",
           properties: {
@@ -357,13 +445,12 @@ Return ONLY the JSON, no extra text.`,
       const unassignedShifts = [];
 
       for (const aiShift of aiShifts) {
-        // וולידציה של יום מול סוג משמרת
         const date = parseISO(aiShift.date);
         const dayOfWeek = getDay(date);
         
         if (!validateShiftForDay(aiShift.shift_type, dayOfWeek)) {
-          console.error(`Invalid shift assignment: ${aiShift.shift_type} on day ${dayOfWeek} (${aiShift.date})`);
-          continue; // דלג על משמרות לא חוקיות
+          console.error(`BLOCKED Invalid shift: ${aiShift.shift_type} on day ${dayOfWeek} (${aiShift.date})`);
+          continue;
         }
 
         const employee = activeEmployees.find(e => e.id === aiShift.employee_id);
@@ -380,7 +467,6 @@ Return ONLY the JSON, no extra text.`,
             schedule_status: 'טיוטה',
           });
         } else if (aiShift.shift_type) {
-          // משמרת ללא עובד
           newShifts.push({
             date: aiShift.date,
             shift_type: aiShift.shift_type,
@@ -395,21 +481,20 @@ Return ONLY the JSON, no extra text.`,
       await base44.entities.Shift.bulkCreate(newShifts);
       queryClient.invalidateQueries(['shifts']);
 
-      // שליחת התראה למנהל על משמרות חסרות
       if (unassignedShifts.length > 0 && currentUser) {
-        const message = `נוצרו ${newShifts.length - unassignedShifts.length} משמרות, אך ${unassignedShifts.length} משמרות לא שובצו בגלל מחסור בעובדים זמינים. רשימה: ${unassignedShifts.map(s => `${s.date} - ${s.type}`).slice(0, 5).join(', ')}${unassignedShifts.length > 5 ? '...' : ''}`;
+        const message = `נוצרו ${newShifts.length - unassignedShifts.length} משמרות, אך ${unassignedShifts.length} משמרות לא שובצו. רשימה: ${unassignedShifts.map(s => `${s.date} (${s.type})`).slice(0, 5).join(', ')}${unassignedShifts.length > 5 ? '...' : ''}. שקול להציע תמריצים או לבקש מעובדים גמישות.`;
         
         await base44.entities.Notification.create({
           user_id: currentUser.id,
           type: 'shift_changed',
-          title: 'סקיצת משמרות לא שלמה',
+          title: `⚠️ סקיצה לא שלמה - ${unassignedShifts.length} משמרות חסרות`,
           message,
         });
       }
 
       toast({
         title: 'הסקיצה נוצרה',
-        description: `נוצרו ${newShifts.length} משמרות. ${unassignedShifts.length > 0 ? `⚠️ ${unassignedShifts.length} משמרות לא שובצו.` : ''}`,
+        description: `${newShifts.filter(s => s.assigned_employee_id).length} משמרות שובצו. ${unassignedShifts.length > 0 ? `⚠️ ${unassignedShifts.length} חסרות.` : '✓ הכל שובץ!'}`,
       });
     } catch (error) {
       console.error('שגיאה ביצירת סידור:', error);
@@ -432,7 +517,6 @@ Return ONLY the JSON, no extra text.`,
       const dayOfWeek = getDay(date);
       if (dayOfWeek === 6) continue;
 
-      // וולידציה של יום מול סוג משמרת
       if (!validateShiftForDay(shiftType, dayOfWeek)) {
         console.warn(`Skipping invalid shift: ${shiftType} on day ${dayOfWeek}`);
         continue;
@@ -531,6 +615,10 @@ Return ONLY the JSON, no extra text.`,
           
           <div className="flex gap-3 flex-wrap">
             {currentUser && <NotificationBell userId={currentUser.id} />}
+            <Button onClick={() => setVacationDialogOpen(true)} variant="outline">
+              <Briefcase className="w-4 h-4 ml-2" />
+              בקשות חופשה {pendingVacations.length > 0 && `(${pendingVacations.length})`}
+            </Button>
             <Button onClick={() => setRecurringDialogOpen(true)} variant="outline">
               <Plus className="w-4 h-4 ml-2" />
               משמרות חוזרות
@@ -622,7 +710,6 @@ Return ONLY the JSON, no extra text.`,
 
         <MonthCalendar year={year} month={month} renderDay={renderDay} />
 
-        {/* ... rest of dialogs ... */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContent dir="rtl" className="max-w-2xl">
             <DialogHeader>
@@ -691,6 +778,20 @@ Return ONLY the JSON, no extra text.`,
                 החל סינון
               </Button>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={vacationDialogOpen} onOpenChange={setVacationDialogOpen}>
+          <DialogContent dir="rtl" className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>ניהול בקשות חופשה והיעדרות</DialogTitle>
+            </DialogHeader>
+            <VacationManager
+              vacationRequests={vacationRequests}
+              employees={employees}
+              onApprove={handleApproveVacation}
+              onReject={handleRejectVacation}
+            />
           </DialogContent>
         </Dialog>
 

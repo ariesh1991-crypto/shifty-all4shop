@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { format, getMonth, getYear } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 import { Pencil, Trash2, ArrowRight, UserPlus, Search, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { Link } from 'react-router-dom';
@@ -27,11 +29,16 @@ export default function ManageEmployees() {
     full_name: '',
     active: true,
     contract_type: '08:00–17:00 / 10:00–19:00',
+    start_date: '',
     notes: '',
   });
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const year = getYear(new Date());
+  const month = getMonth(new Date()) + 1;
+  const monthKey = `${year}-${String(month).padStart(2, '0')}`;
 
   const { data: employees = [] } = useQuery({
     queryKey: ['employees'],
@@ -43,23 +50,30 @@ export default function ManageEmployees() {
     queryFn: () => base44.entities.User.list(),
   });
 
+  const { data: allShifts = [] } = useQuery({
+    queryKey: ['shifts', monthKey],
+    queryFn: async () => {
+      const all = await base44.entities.Shift.list();
+      return all.filter(s => s.date && s.date.startsWith(monthKey));
+    },
+  });
+
   const createMutation = useMutation({
     mutationFn: (data) => base44.entities.Employee.create(data),
     onSuccess: async (newEmployee) => {
       await queryClient.invalidateQueries(['employees']);
       
-      // אם יש משתמש שממתין לחיבור, חבר אותו אוטומטית
       if (selectedUser) {
         try {
           await base44.entities.Employee.update(newEmployee.id, { user_id: selectedUser.id });
           await queryClient.invalidateQueries(['employees']);
-          // עובד נוסף וחובר
+          toast({ title: 'עובד נוסף וחובר בהצלחה' });
           setSelectedUser(null);
         } catch (error) {
-          console.error('עובד נוסף אך הקישור למשתמש נכשל');
+          toast({ title: 'עובד נוסף אך החיבור נכשל', variant: 'destructive' });
         }
       } else {
-        // עובד נוסף
+        toast({ title: 'עובד נוסף בהצלחה' });
       }
       
       setDialogOpen(false);
@@ -71,7 +85,7 @@ export default function ManageEmployees() {
     mutationFn: ({ id, data }) => base44.entities.Employee.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries(['employees']);
-      // עובד עודכן
+      toast({ title: 'עובד עודכן בהצלחה' });
       setDialogOpen(false);
       resetForm();
     },
@@ -81,7 +95,7 @@ export default function ManageEmployees() {
     mutationFn: (id) => base44.entities.Employee.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['employees']);
-      // עובד נמחק
+      toast({ title: 'עובד נמחק בהצלחה' });
     },
   });
 
@@ -89,7 +103,7 @@ export default function ManageEmployees() {
     mutationFn: ({ employeeId, userId }) => base44.entities.Employee.update(employeeId, { user_id: userId }),
     onSuccess: () => {
       queryClient.invalidateQueries(['employees']);
-      // משתמש חובר
+      toast({ title: 'משתמש חובר בהצלחה' });
       setLinkDialogOpen(false);
       setQuickLinkDialogOpen(false);
     },
@@ -100,6 +114,7 @@ export default function ManageEmployees() {
       full_name: '',
       active: true,
       contract_type: '08:00–17:00 / 10:00–19:00',
+      start_date: '',
       notes: '',
     });
     setEditingEmployee(null);
@@ -120,6 +135,7 @@ export default function ManageEmployees() {
       full_name: employee.full_name,
       active: employee.active,
       contract_type: employee.contract_type,
+      start_date: employee.start_date || '',
       notes: employee.notes || '',
     });
     setDialogOpen(true);
@@ -140,6 +156,10 @@ export default function ManageEmployees() {
   });
 
   const unlinkedUsers = users.filter(u => !employees.some(e => e.user_id === u.id));
+
+  const getEmployeeShiftCount = (employeeId) => {
+    return allShifts.filter(s => s.assigned_employee_id === employeeId).length;
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-6" dir="rtl">
@@ -189,13 +209,11 @@ export default function ManageEmployees() {
                               !e.user_id && e.full_name.toLowerCase() === (user.full_name?.toLowerCase() || '')
                             );
                             if (matchingEmp) {
-                              // התאמה מדויקת - חבר מיד
                               linkUserMutation.mutate({ 
                                 employeeId: matchingEmp.id, 
                                 userId: user.id 
                               });
                             } else {
-                              // אין התאמה מדויקת - פתח דיאלוג עם אפשרויות
                               setSelectedUser(user);
                               setQuickLinkDialogOpen(true);
                             }
@@ -213,6 +231,7 @@ export default function ManageEmployees() {
                               full_name: user.full_name || user.email,
                               active: true,
                               contract_type: '08:00–17:00 / 10:00–19:00',
+                              start_date: format(new Date(), 'yyyy-MM-dd'),
                               notes: '',
                             });
                             setDialogOpen(true);
@@ -263,20 +282,35 @@ export default function ManageEmployees() {
             <TableHeader>
               <TableRow>
                 <TableHead className="text-right">שם עובד</TableHead>
-                <TableHead className="text-right">פעיל</TableHead>
+                <TableHead className="text-right">סטטוס</TableHead>
+                <TableHead className="text-right">תאריך תחילה</TableHead>
+                <TableHead className="text-right">משמרות החודש</TableHead>
                 <TableHead className="text-right">משתמש מחובר</TableHead>
-                <TableHead className="text-right">סוג חוזה שעות</TableHead>
-                <TableHead className="text-right">הערות</TableHead>
+                <TableHead className="text-right">סוג חוזה</TableHead>
                 <TableHead className="text-right">פעולות</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredEmployees.map((employee) => {
                 const linkedUser = users.find(u => u.id === employee.user_id);
+                const shiftCount = getEmployeeShiftCount(employee.id);
                 return (
                   <TableRow key={employee.id}>
                     <TableCell className="font-medium">{employee.full_name}</TableCell>
-                    <TableCell>{employee.active ? '✓' : '✗'}</TableCell>
+                    <TableCell>
+                      <Badge variant={employee.active ? 'default' : 'secondary'}>
+                        {employee.active ? 'פעיל' : 'לא פעיל'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {employee.start_date ? format(new Date(employee.start_date), 'dd/MM/yyyy') : '-'}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">{shiftCount}</Badge>
+                        <span className="text-xs text-gray-500">משמרות</span>
+                      </div>
+                    </TableCell>
                     <TableCell>
                       {linkedUser ? (
                         <div className="flex items-center gap-2 text-green-600">
@@ -287,8 +321,7 @@ export default function ManageEmployees() {
                         <span className="text-gray-400">לא מחובר</span>
                       )}
                     </TableCell>
-                    <TableCell>{employee.contract_type}</TableCell>
-                    <TableCell className="max-w-xs truncate">{employee.notes || '-'}</TableCell>
+                    <TableCell className="text-sm">{employee.contract_type}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
                         <Button 
@@ -336,6 +369,15 @@ export default function ManageEmployees() {
                   onCheckedChange={(checked) => setFormData({ ...formData, active: checked })}
                 />
                 <Label>פעיל</Label>
+              </div>
+
+              <div>
+                <Label>תאריך תחילת העסקה (אופציונלי)</Label>
+                <Input
+                  type="date"
+                  value={formData.start_date}
+                  onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                />
               </div>
 
               <div>
@@ -424,6 +466,7 @@ export default function ManageEmployees() {
                         full_name: selectedUser.full_name || selectedUser.email,
                         active: true,
                         contract_type: '08:00–17:00 / 10:00–19:00',
+                        start_date: format(new Date(), 'yyyy-MM-dd'),
                         notes: '',
                       });
                       setQuickLinkDialogOpen(false);

@@ -1,27 +1,113 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { base44 } from '@/api/base44Client';
+import { Button } from '@/components/ui/button';
+import { LogOut, Clock, AlertCircle } from 'lucide-react';
 
 const UserNotRegisteredError = () => {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const user = await base44.auth.me();
+        setCurrentUser(user);
+        setIsAdmin(user.role === 'admin');
+        
+        // שלח התראה למנהלים שמשתמש חדש נרשם
+        if (user.role !== 'admin') {
+          // שלח התראות לכל המנהלים
+          const allUsers = await base44.entities.User.list();
+          const admins = allUsers.filter(u => u.role === 'admin');
+          
+          for (const admin of admins) {
+            // בדוק אם כבר שלחנו התראה למנהל הזה
+            const existingNotifications = await base44.entities.Notification.list();
+            const alreadyNotified = existingNotifications.some(
+              n => n.user_id === admin.id && 
+                   n.type === 'new_user_pending' && 
+                   n.message.includes(user.email)
+            );
+            
+            if (!alreadyNotified) {
+              await base44.entities.Notification.create({
+                user_id: admin.id,
+                type: 'new_user_pending',
+                title: 'משתמש חדש ממתין לחיבור',
+                message: `${user.full_name || user.email} נרשם למערכת וממתין שתחבר אותו לרשומת עובד`,
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading user:', error);
+      }
+    };
+    loadUser();
+  }, []);
+
+  if (isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-6" dir="rtl">
+        <div className="max-w-2xl w-full p-8 bg-white rounded-lg shadow-lg">
+          <div className="text-center">
+            <AlertCircle className="w-16 h-16 text-blue-500 mx-auto mb-4" />
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">אתה מנהל - חבר את עצמך לרשומת עובד</h1>
+            <p className="text-gray-600 mb-6 text-lg">
+              בתור מנהל, אתה צריך ליצור רשומת עובד עבור עצמך ולחבר אותה למשתמש שלך.
+            </p>
+            <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-6 mb-6 text-right">
+              <p className="font-bold mb-3 text-lg">שלבים:</p>
+              <ol className="list-decimal list-inside space-y-2 text-gray-700">
+                <li>עבור ל"ניהול עובדים"</li>
+                <li>צור רשומת עובד חדשה עבור עצמך</li>
+                <li>לחץ על כפתור "חיבור משתמש" ליד העובד שיצרת</li>
+                <li>בחר את המשתמש שלך מהרשימה</li>
+                <li>רענן את הדף</li>
+              </ol>
+            </div>
+            <div className="flex gap-3 justify-center">
+              <Button onClick={() => window.location.href = '/ManageEmployees'}>
+                עבור לניהול עובדים
+              </Button>
+              <Button variant="outline" onClick={() => base44.auth.logout()}>
+                <LogOut className="w-4 h-4 ml-2" />
+                יציאה
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-white to-slate-50">
-      <div className="max-w-md w-full p-8 bg-white rounded-lg shadow-lg border border-slate-100">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-6" dir="rtl">
+      <div className="max-w-2xl w-full p-8 bg-white rounded-lg shadow-lg">
         <div className="text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 mb-6 rounded-full bg-orange-100">
-            <svg className="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-4">Access Restricted</h1>
-          <p className="text-slate-600 mb-8">
-            You are not registered to use this application. Please contact the app administrator to request access.
+          <Clock className="w-16 h-16 text-orange-500 mx-auto mb-4" />
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">חשבונך ממתין לחיבור</h1>
+          <p className="text-gray-600 mb-6 text-lg">
+            נרשמת בהצלחה! המנהל יחבר את חשבונך לרשומת העובד שלך בקרוב.
           </p>
-          <div className="p-4 bg-slate-50 rounded-md text-sm text-slate-600">
-            <p>If you believe this is an error, you can:</p>
-            <ul className="list-disc list-inside mt-2 space-y-1">
-              <li>Verify you are logged in with the correct account</li>
-              <li>Contact the app administrator for access</li>
-              <li>Try logging out and back in again</li>
-            </ul>
+          <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-6 mb-6 text-right">
+            <p className="font-bold mb-3 text-lg">מה קורה עכשיו?</p>
+            <ol className="list-decimal list-inside space-y-2 text-gray-700">
+              <li>המנהל קיבל התראה על ההרשמה שלך</li>
+              <li>הוא יחבר את חשבונך ({currentUser?.email}) לרשומת העובד שלך במערכת</li>
+              <li>לאחר החיבור תוכל להיכנס ולנהל את האילוצים וההעדפות שלך</li>
+            </ol>
           </div>
+          <div className="bg-gray-50 rounded-lg p-4 mb-6">
+            <p className="text-sm text-gray-600">
+              <strong>לידיעתך:</strong> המנהל מקבל התראה אוטומטית כאשר אתה נרשם. 
+              אם זה לוקח זמן, אפשר ליצור איתו קשר ולהזכיר לו לחבר אותך בדף "ניהול עובדים".
+            </p>
+          </div>
+          <Button onClick={() => base44.auth.logout()} variant="outline" size="lg">
+            <LogOut className="w-4 h-4 ml-2" />
+            יציאה
+          </Button>
         </div>
       </div>
     </div>

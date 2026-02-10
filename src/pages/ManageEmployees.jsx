@@ -9,13 +9,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Pencil, Trash2, Plus, ArrowRight } from 'lucide-react';
+import { Pencil, Trash2, Plus, ArrowRight, UserPlus } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 
 export default function ManageEmployees() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [formData, setFormData] = useState({
     full_name: '',
@@ -30,6 +32,11 @@ export default function ManageEmployees() {
   const { data: employees = [] } = useQuery({
     queryKey: ['employees'],
     queryFn: () => base44.entities.Employee.list(),
+  });
+
+  const { data: users = [] } = useQuery({
+    queryKey: ['users'],
+    queryFn: () => base44.entities.User.list(),
   });
 
   const createMutation = useMutation({
@@ -57,6 +64,15 @@ export default function ManageEmployees() {
     onSuccess: () => {
       queryClient.invalidateQueries(['employees']);
       toast({ title: 'עובד נמחק בהצלחה' });
+    },
+  });
+
+  const linkUserMutation = useMutation({
+    mutationFn: ({ employeeId, userId }) => base44.entities.Employee.update(employeeId, { user_id: userId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['employees']);
+      toast({ title: 'משתמש חובר לעובד בהצלחה' });
+      setLinkDialogOpen(false);
     },
   });
 
@@ -121,30 +137,49 @@ export default function ManageEmployees() {
               <TableRow>
                 <TableHead className="text-right">שם עובד</TableHead>
                 <TableHead className="text-right">פעיל</TableHead>
+                <TableHead className="text-right">משתמש מחובר</TableHead>
                 <TableHead className="text-right">סוג חוזה שעות</TableHead>
                 <TableHead className="text-right">הערות</TableHead>
                 <TableHead className="text-right">פעולות</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {employees.map((employee) => (
-                <TableRow key={employee.id}>
-                  <TableCell className="font-medium">{employee.full_name}</TableCell>
-                  <TableCell>{employee.active ? '✓' : '✗'}</TableCell>
-                  <TableCell>{employee.contract_type}</TableCell>
-                  <TableCell className="max-w-xs truncate">{employee.notes || '-'}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => handleEdit(employee)}>
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <Button size="sm" variant="destructive" onClick={() => handleDelete(employee.id)}>
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {employees.map((employee) => {
+                const linkedUser = users.find(u => u.id === employee.user_id);
+                return (
+                  <TableRow key={employee.id}>
+                    <TableCell className="font-medium">{employee.full_name}</TableCell>
+                    <TableCell>{employee.active ? '✓' : '✗'}</TableCell>
+                    <TableCell>
+                      {linkedUser ? (
+                        <span className="text-green-600">{linkedUser.email}</span>
+                      ) : (
+                        <span className="text-gray-400">לא מחובר</span>
+                      )}
+                    </TableCell>
+                    <TableCell>{employee.contract_type}</TableCell>
+                    <TableCell className="max-w-xs truncate">{employee.notes || '-'}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={() => { setSelectedEmployee(employee); setLinkDialogOpen(true); }}
+                          title="חבר משתמש"
+                        >
+                          <UserPlus className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => handleEdit(employee)}>
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" variant="destructive" onClick={() => handleDelete(employee.id)}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
@@ -204,6 +239,35 @@ export default function ManageEmployees() {
                 </Button>
               </div>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
+          <DialogContent dir="rtl">
+            <DialogHeader>
+              <DialogTitle>חיבור משתמש לעובד: {selectedEmployee?.full_name}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">בחר משתמש שנרשם למערכת כדי לחבר אותו לרשומת העובד</p>
+              <div className="space-y-2">
+                {users.filter(u => !employees.some(e => e.user_id === u.id)).map(user => (
+                  <Button
+                    key={user.id}
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => linkUserMutation.mutate({ employeeId: selectedEmployee.id, userId: user.id })}
+                  >
+                    <div className="text-right">
+                      <div className="font-medium">{user.full_name}</div>
+                      <div className="text-sm text-gray-500">{user.email}</div>
+                    </div>
+                  </Button>
+                ))}
+                {users.filter(u => !employees.some(e => e.user_id === u.id)).length === 0 && (
+                  <p className="text-sm text-gray-500 text-center py-4">אין משתמשים זמינים לחיבור</p>
+                )}
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

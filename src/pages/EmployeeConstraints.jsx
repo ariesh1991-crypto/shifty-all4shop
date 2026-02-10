@@ -29,7 +29,7 @@ export default function EmployeeConstraints() {
       try {
         const user = await base44.auth.me();
         const allEmployees = await base44.entities.Employee.list();
-        const employee = allEmployees.find(emp => emp.created_by?.toLowerCase() === user.email.toLowerCase());
+        const employee = allEmployees.find(emp => emp.user_id === user.id);
         setCurrentEmployee(employee);
       } finally {
         setLoading(false);
@@ -123,8 +123,8 @@ export default function EmployeeConstraints() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50 p-6" dir="rtl">
         <div className="bg-white rounded-lg shadow-lg p-8 max-w-md text-center">
-          <h2 className="text-2xl font-bold mb-4">חשבונך ממתין לאישור</h2>
-          <p className="text-gray-600 mb-6">מנהל המערכת יאשר את החשבון שלך בקרוב</p>
+          <h2 className="text-2xl font-bold mb-4">חשבונך ממתין לחיבור</h2>
+          <p className="text-gray-600 mb-6">מנהל המערכת יחבר את חשבונך לרשומת העובד שלך בקרוב</p>
           <Button onClick={() => base44.auth.logout()}>
             <LogOut className="w-4 h-4 ml-2" />
             יציאה

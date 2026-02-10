@@ -150,6 +150,12 @@ export default function EmployeeConstraints() {
   }
 
   if (!currentEmployee) {
+    // אם המשתמש הוא מנהל, תן לו להיכנס למערכת ללא חיבור לעובד
+    if (currentUser?.role === 'admin') {
+      window.location.href = '/ManagerDashboard';
+      return <div className="min-h-screen flex items-center justify-center" dir="rtl">מעביר אותך ללוח בקרה...</div>;
+    }
+    
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50 p-6" dir="rtl">
         <div className="bg-white rounded-lg shadow-lg p-8 max-w-md text-center">

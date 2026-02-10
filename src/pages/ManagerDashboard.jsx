@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, getMonth, getYear, getDay, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, parseISO } from 'date-fns';
-import { ChevronLeft, ChevronRight, Sparkles, Users, LogOut, AlertCircle, ArrowLeftRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Sparkles, Users, LogOut, AlertCircle, ArrowLeftRight, Plus, Filter } from 'lucide-react';
 import NotificationBell from '../components/notifications/NotificationBell';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -14,6 +14,8 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const SHIFT_COLORS = {
   'קצרה': 'bg-blue-200',
@@ -51,8 +53,12 @@ export default function ManagerDashboard() {
   const [selectedDate, setSelectedDate] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [swapDialogOpen, setSwapDialogOpen] = useState(false);
+  const [recurringDialogOpen, setRecurringDialogOpen] = useState(false);
+  const [filterDialogOpen, setFilterDialogOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [filterEmployee, setFilterEmployee] = useState('all');
+  const [filterShiftType, setFilterShiftType] = useState('all');
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -73,11 +79,25 @@ export default function ManagerDashboard() {
     queryFn: () => base44.entities.Employee.list(),
   });
 
-  const { data: shifts = [] } = useQuery({
+  const { data: allShifts = [] } = useQuery({
     queryKey: ['shifts', year, month],
     queryFn: async () => {
       const allShifts = await base44.entities.Shift.list();
       return allShifts.filter(s => s.date && s.date.startsWith(monthKey));
+    },
+  });
+
+  const shifts = allShifts.filter(shift => {
+    const employeeMatch = filterEmployee === 'all' || shift.assigned_employee_id === filterEmployee;
+    const shiftTypeMatch = filterShiftType === 'all' || shift.shift_type === filterShiftType;
+    return employeeMatch && shiftTypeMatch;
+  });
+
+  const createShiftMutation = useMutation({
+    mutationFn: (data) => base44.entities.Shift.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['shifts']);
+      toast({ title: 'משמרת נוצרה' });
     },
   });
 
@@ -342,12 +362,44 @@ export default function ManagerDashboard() {
     }
   };
 
+  const handleCreateRecurringShifts = async (startDate, endDate, shiftType, employeeId) => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const dates = eachDayOfInterval({ start, end });
+    
+    const employee = employees.find(e => e.id === employeeId);
+    if (!employee) return;
+
+    const newShifts = [];
+    for (const date of dates) {
+      const dayOfWeek = getDay(date);
+      if (dayOfWeek === 6) continue;
+
+      const dateStr = format(date, 'yyyy-MM-dd');
+      const times = calculateShiftTimes(shiftType, employee.contract_type);
+      
+      newShifts.push({
+        date: dateStr,
+        shift_type: shiftType,
+        assigned_employee_id: employeeId,
+        start_time: times.start,
+        end_time: times.end,
+        status: 'תקין',
+      });
+    }
+
+    await base44.entities.Shift.bulkCreate(newShifts);
+    queryClient.invalidateQueries(['shifts']);
+    setRecurringDialogOpen(false);
+    toast({ title: `נוצרו ${newShifts.length} משמרות` });
+  };
+
   const renderDay = (date) => {
     const dayOfWeek = getDay(date);
     if (dayOfWeek === 6) return null;
 
     const dateStr = format(date, 'yyyy-MM-dd');
-    const dayShifts = shifts.filter(s => s.date === dateStr);
+    const dayShifts = allShifts.filter(s => s.date === dateStr);
     const dayNumber = format(date, 'd');
     const isFriday = dayOfWeek === 5;
 
@@ -391,8 +443,16 @@ export default function ManagerDashboard() {
         <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
           <h1 className="text-3xl font-bold">לוח משמרות</h1>
           
-          <div className="flex gap-3">
+          <div className="flex gap-3 flex-wrap">
             {currentUser && <NotificationBell userId={currentUser.id} />}
+            <Button onClick={() => setRecurringDialogOpen(true)} variant="outline">
+              <Plus className="w-4 h-4 ml-2" />
+              משמרות חוזרות
+            </Button>
+            <Button onClick={() => setFilterDialogOpen(true)} variant="outline">
+              <Filter className="w-4 h-4 ml-2" />
+              סינון
+            </Button>
             <Link to={createPageUrl('ManageEmployees')}>
               <Button variant="outline">
                 <Users className="w-4 h-4 ml-2" />
@@ -420,39 +480,94 @@ export default function ManagerDashboard() {
           </div>
         </div>
 
+        {(filterEmployee !== 'all' || filterShiftType !== 'all') && (
+          <div className="bg-white rounded-lg shadow-md p-4 mb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex gap-2 items-center">
+                <span className="text-sm font-medium">סינון פעיל:</span>
+                {filterEmployee !== 'all' && (
+                  <Badge>{employees.find(e => e.id === filterEmployee)?.full_name}</Badge>
+                )}
+                {filterShiftType !== 'all' && (
+                  <Badge>{filterShiftType}</Badge>
+                )}
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => { setFilterEmployee('all'); setFilterShiftType('all'); }}>
+                נקה סינון
+              </Button>
+            </div>
+          </div>
+        )}
+
         <MonthCalendar year={year} month={month} renderDay={renderDay} />
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent dir="rtl">
+          <DialogContent dir="rtl" className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>עריכת משמרות - {selectedDate}</DialogTitle>
             </DialogHeader>
+            <ShiftEditor
+              selectedDate={selectedDate}
+              shifts={allShifts.filter(s => s.date === selectedDate)}
+              employees={employees}
+              onDelete={(id) => deleteShiftMutation.mutate(id)}
+              onUpdate={(id, data) => updateShiftMutation.mutate({ id, data })}
+              onCreate={(data) => createShiftMutation.mutate(data)}
+              onClose={() => setDialogOpen(false)}
+            />
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={recurringDialogOpen} onOpenChange={setRecurringDialogOpen}>
+          <DialogContent dir="rtl">
+            <DialogHeader>
+              <DialogTitle>יצירת משמרות חוזרות</DialogTitle>
+            </DialogHeader>
+            <RecurringShiftForm
+              employees={employees.filter(e => e.active)}
+              onCreate={handleCreateRecurringShifts}
+            />
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={filterDialogOpen} onOpenChange={setFilterDialogOpen}>
+          <DialogContent dir="rtl">
+            <DialogHeader>
+              <DialogTitle>סינון משמרות</DialogTitle>
+            </DialogHeader>
             <div className="space-y-4">
-              {shifts.filter(s => s.date === selectedDate).map(shift => (
-                <div key={shift.id} className="border p-3 rounded">
-                  <div className="font-bold">{shift.shift_type}</div>
-                  {shift.assigned_employee_id && (
-                    <>
-                      <div>עובד: {employees.find(e => e.id === shift.assigned_employee_id)?.full_name}</div>
-                      {shift.start_time && shift.end_time && (
-                        <div className="text-sm text-gray-600">{shift.start_time}–{shift.end_time}</div>
-                      )}
-                    </>
-                  )}
-                  <div className="mt-2 text-sm">סטטוס: {shift.status}</div>
-                  <Button 
-                    variant="destructive" 
-                    size="sm" 
-                    className="mt-2"
-                    onClick={async () => {
-                      await deleteShiftMutation.mutateAsync(shift.id);
-                      setDialogOpen(false);
-                    }}
-                  >
-                    מחק
-                  </Button>
-                </div>
-              ))}
+              <div>
+                <Label>עובד</Label>
+                <Select value={filterEmployee} onValueChange={setFilterEmployee}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">כל העובדים</SelectItem>
+                    {employees.map(emp => (
+                      <SelectItem key={emp.id} value={emp.id}>{emp.full_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>סוג משמרת</Label>
+                <Select value={filterShiftType} onValueChange={setFilterShiftType}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">כל המשמרות</SelectItem>
+                    <SelectItem value="קצרה">קצרה</SelectItem>
+                    <SelectItem value="ארוכה">ארוכה</SelectItem>
+                    <SelectItem value="שישי קצר">שישי קצר</SelectItem>
+                    <SelectItem value="שישי ארוך">שישי ארוך</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button onClick={() => setFilterDialogOpen(false)} className="w-full">
+                החל סינון
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -473,6 +588,169 @@ export default function ManagerDashboard() {
         </Dialog>
       </div>
     </div>
+  );
+}
+
+function ShiftEditor({ selectedDate, shifts, employees, onDelete, onUpdate, onCreate, onClose }) {
+  const [newShiftType, setNewShiftType] = useState('');
+  const [newEmployeeId, setNewEmployeeId] = useState('');
+
+  const handleCreate = () => {
+    if (!newShiftType || !newEmployeeId) return;
+    
+    const employee = employees.find(e => e.id === newEmployeeId);
+    const times = calculateShiftTimes(newShiftType, employee.contract_type);
+    
+    onCreate({
+      date: selectedDate,
+      shift_type: newShiftType,
+      assigned_employee_id: newEmployeeId,
+      start_time: times.start,
+      end_time: times.end,
+      status: 'תקין',
+    });
+    
+    setNewShiftType('');
+    setNewEmployeeId('');
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-blue-50 p-4 rounded-lg">
+        <h3 className="font-bold mb-3">הוסף משמרת חדשה</h3>
+        <div className="space-y-3">
+          <Select value={newShiftType} onValueChange={setNewShiftType}>
+            <SelectTrigger>
+              <SelectValue placeholder="בחר סוג משמרת..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="קצרה">קצרה</SelectItem>
+              <SelectItem value="ארוכה">ארוכה</SelectItem>
+              <SelectItem value="שישי קצר">שישי קצר</SelectItem>
+              <SelectItem value="שישי ארוך">שישי ארוך</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={newEmployeeId} onValueChange={setNewEmployeeId}>
+            <SelectTrigger>
+              <SelectValue placeholder="בחר עובד..." />
+            </SelectTrigger>
+            <SelectContent>
+              {employees.filter(e => e.active).map(emp => (
+                <SelectItem key={emp.id} value={emp.id}>{emp.full_name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button onClick={handleCreate} className="w-full" disabled={!newShiftType || !newEmployeeId}>
+            <Plus className="w-4 h-4 ml-2" />
+            הוסף משמרת
+          </Button>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <h3 className="font-bold">משמרות קיימות</h3>
+        {shifts.length === 0 ? (
+          <p className="text-center text-gray-500 py-4">אין משמרות ליום זה</p>
+        ) : (
+          shifts.map(shift => (
+            <div key={shift.id} className="border p-3 rounded">
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <div className="font-bold">{shift.shift_type}</div>
+                  {shift.assigned_employee_id && (
+                    <>
+                      <div>עובד: {employees.find(e => e.id === shift.assigned_employee_id)?.full_name}</div>
+                      {shift.start_time && shift.end_time && (
+                        <div className="text-sm text-gray-600">{shift.start_time}–{shift.end_time}</div>
+                      )}
+                    </>
+                  )}
+                  <div className="mt-1 text-sm">סטטוס: {shift.status}</div>
+                </div>
+                <div className="flex gap-2">
+                  <Select
+                    value={shift.assigned_employee_id || ''}
+                    onValueChange={(value) => onUpdate(shift.id, { ...shift, assigned_employee_id: value })}
+                  >
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="שבץ עובד" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {employees.filter(e => e.active).map(emp => (
+                        <SelectItem key={emp.id} value={emp.id}>{emp.full_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button 
+                    variant="destructive" 
+                    size="sm"
+                    onClick={() => {
+                      onDelete(shift.id);
+                      if (shifts.length === 1) onClose();
+                    }}
+                  >
+                    מחק
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RecurringShiftForm({ employees, onCreate }) {
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [shiftType, setShiftType] = useState('');
+  const [employeeId, setEmployeeId] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onCreate(startDate, endDate, shiftType, employeeId);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <Label>תאריך התחלה</Label>
+        <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
+      </div>
+      <div>
+        <Label>תאריך סיום</Label>
+        <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required />
+      </div>
+      <div>
+        <Label>סוג משמרת</Label>
+        <Select value={shiftType} onValueChange={setShiftType} required>
+          <SelectTrigger>
+            <SelectValue placeholder="בחר סוג משמרת..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="קצרה">קצרה</SelectItem>
+            <SelectItem value="ארוכה">ארוכה</SelectItem>
+            <SelectItem value="שישי קצר">שישי קצר</SelectItem>
+            <SelectItem value="שישי ארוך">שישי ארוך</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
+        <Label>עובד</Label>
+        <Select value={employeeId} onValueChange={setEmployeeId} required>
+          <SelectTrigger>
+            <SelectValue placeholder="בחר עובד..." />
+          </SelectTrigger>
+          <SelectContent>
+            {employees.map(emp => (
+              <SelectItem key={emp.id} value={emp.id}>{emp.full_name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <Button type="submit" className="w-full">צור משמרות</Button>
+    </form>
   );
 }
 

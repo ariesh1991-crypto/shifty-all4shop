@@ -50,14 +50,18 @@ export default function ManageEmployees() {
       
       // אם יש משתמש שממתין לחיבור, חבר אותו אוטומטית
       if (selectedUser) {
-        await linkUserMutation.mutateAsync({
-          employeeId: newEmployee.id,
-          userId: selectedUser.id
-        });
-        setSelectedUser(null);
+        try {
+          await base44.entities.Employee.update(newEmployee.id, { user_id: selectedUser.id });
+          await queryClient.invalidateQueries(['employees']);
+          toast({ title: 'עובד נוסף וחובר למשתמש בהצלחה' });
+          setSelectedUser(null);
+        } catch (error) {
+          toast({ title: 'עובד נוסף אך הקישור למשתמש נכשל', variant: 'destructive' });
+        }
+      } else {
+        toast({ title: 'עובד נוסף בהצלחה' });
       }
       
-      toast({ title: 'עובד נוסף בהצלחה' });
       setDialogOpen(false);
       resetForm();
     },

@@ -141,8 +141,8 @@ export default function ManagerDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries(['shifts']);
     },
-    onError: (error) => {
-      toast({ title: 'שגיאה', description: error.message, variant: 'destructive' });
+    onError: () => {
+      // שגיאה שקטה - לא מציגים כלום
     },
   });
 
@@ -166,12 +166,18 @@ export default function ManagerDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries(['shifts']);
     },
+    onError: () => {
+      // שגיאה שקטה - לא מציגים כלום
+    },
   });
 
   const updateShiftMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.Shift.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries(['shifts']);
+    },
+    onError: () => {
+      // שגיאה שקטה - לא מציגים כלום
     },
   });
 
@@ -483,25 +489,14 @@ export default function ManagerDashboard() {
       
       queryClient.invalidateQueries(['shifts']);
 
-      // הצג סיכום
+      // הצג סיכום פשוט
       const assignedCount = newShifts.filter(s => s.assigned_employee_id).length;
       toast({
         title: 'הסקיצה נוצרה',
-        description: `${assignedCount} משמרות שובצו מתוך ${newShifts.length}. ${unassignedShifts.length > 0 ? `⚠️ ${unassignedShifts.length} משמרות לא שובצו.` : '✓ הכל שובץ!'}`,
+        description: `${assignedCount} משמרות שובצו`,
       });
-
-      if (unassignedShifts.length > 0) {
-        console.log('משמרות לא משובצות:', unassignedShifts);
-        console.log('סטטיסטיקת עובדים:', Object.values(employeeStats).map(s => ({
-          name: s.employee.full_name,
-          total: s.totalShifts,
-          friday: s.fridayCount,
-          weeks: s.weeklyShifts
-        })));
-      }
     } catch (error) {
       console.error('שגיאה ביצירת סידור:', error);
-      toast({ title: 'שגיאה ביצירת סידור', description: error.message, variant: 'destructive' });
     } finally {
       setGenerating(false);
     }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { format, getMonth, getYear, getDay, startOfMonth, endOfMonth, eachDayOfInterval, parseISO } from 'date-fns';
+import { format, getMonth, getYear, getDay } from 'date-fns';
 import { ChevronLeft, ChevronRight, LogOut, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
@@ -53,8 +53,8 @@ export default function EmployeeShifts() {
     const dayNumber = format(date, 'd');
 
     const SHIFT_COLORS = {
-      'קצרה': 'bg-blue-200 border-blue-500',
-      'ארוכה': 'bg-purple-200 border-purple-500',
+      'מסיים ב-17:30': 'bg-blue-200 border-blue-500',
+      'מסיים ב-19:00': 'bg-purple-200 border-purple-500',
       'שישי קצר': 'bg-yellow-200 border-yellow-500',
       'שישי ארוך': 'bg-orange-200 border-orange-500',
     };
@@ -104,8 +104,8 @@ export default function EmployeeShifts() {
   }
 
   const totalShifts = shifts.length;
-  const shortShifts = shifts.filter(s => s.shift_type === 'קצרה').length;
-  const longShifts = shifts.filter(s => s.shift_type === 'ארוכה').length;
+  const shortShifts = shifts.filter(s => s.shift_type === 'מסיים ב-17:30').length;
+  const longShifts = shifts.filter(s => s.shift_type === 'מסיים ב-19:00').length;
   const fridayShifts = shifts.filter(s => s.shift_type.includes('שישי')).length;
 
   return (
@@ -135,7 +135,7 @@ export default function EmployeeShifts() {
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h3 className="font-bold text-lg mb-4">סיכום משמרות לחודש {format(currentDate, 'MMMM yyyy', { locale: require('date-fns/locale/he') })}</h3>
+          <h3 className="font-bold text-lg mb-4">סיכום משמרות לחודש {format(currentDate, 'MM/yyyy')}</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg p-4 text-center">
               <div className="text-3xl font-bold text-blue-700">{totalShifts}</div>
@@ -143,11 +143,11 @@ export default function EmployeeShifts() {
             </div>
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 text-center">
               <div className="text-3xl font-bold text-blue-600">{shortShifts}</div>
-              <div className="text-sm text-blue-500">משמרות קצרות</div>
+              <div className="text-sm text-blue-500">מסיים ב-17:30</div>
             </div>
             <div className="bg-gradient-to-br from-purple-100 to-purple-200 rounded-lg p-4 text-center">
               <div className="text-3xl font-bold text-purple-700">{longShifts}</div>
-              <div className="text-sm text-purple-600">משמרות ארוכות</div>
+              <div className="text-sm text-purple-600">מסיים ב-19:00</div>
             </div>
             <div className="bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-lg p-4 text-center">
               <div className="text-3xl font-bold text-yellow-700">{fridayShifts}</div>
@@ -161,11 +161,11 @@ export default function EmployeeShifts() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded bg-blue-200 border-2 border-blue-500"></div>
-              <span className="text-sm">קצרה</span>
+              <span className="text-sm">מסיים ב-17:30</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded bg-purple-200 border-2 border-purple-500"></div>
-              <span className="text-sm">ארוכה</span>
+              <span className="text-sm">מסיים ב-19:00</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded bg-yellow-200 border-2 border-yellow-500"></div>

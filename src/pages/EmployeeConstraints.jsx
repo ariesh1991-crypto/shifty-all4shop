@@ -129,9 +129,8 @@ export default function EmployeeConstraints() {
         onClick={() => { setSelectedDate(dateStr); setDialogOpen(true); }}
         className={`p-3 border-2 rounded-lg cursor-pointer hover:shadow-md min-h-[80px] ${
           constraint?.unavailable ? 'bg-red-100 border-red-400' :
-          constraint?.preference === 'מעדיף קצרה' ? 'bg-blue-100 border-blue-400' :
-          constraint?.preference === 'מעדיף ארוכה' ? 'bg-purple-100 border-purple-400' :
-          constraint?.preference === 'אין העדפה' ? 'bg-gray-100 border-gray-400' :
+          constraint?.preference === 'מעדיף מסיים ב-17:30' ? 'bg-blue-100 border-blue-400' :
+          constraint?.preference === 'מעדיף מסיים ב-19:00' ? 'bg-purple-100 border-purple-400' :
           'bg-white'
         }`}
       >
@@ -205,22 +204,18 @@ export default function EmployeeConstraints() {
 
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
           <h3 className="font-bold mb-2">מקרא:</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded bg-red-100 border-2 border-red-400"></div>
               <span className="text-sm">לא זמין</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded bg-blue-100 border-2 border-blue-400"></div>
-              <span className="text-sm">מעדיף קצרה</span>
+              <span className="text-sm">מעדיף מסיים ב-17:30</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded bg-purple-100 border-2 border-purple-400"></div>
-              <span className="text-sm">מעדיף ארוכה</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded bg-gray-100 border-2 border-gray-400"></div>
-              <span className="text-sm">אין העדפה</span>
+              <span className="text-sm">מעדיף מסיים ב-19:00</span>
             </div>
           </div>
         </div>
@@ -256,26 +251,35 @@ export default function EmployeeConstraints() {
 
 function ConstraintForm({ selectedDate, existingConstraint, onSave, onDelete }) {
   const [unavailable, setUnavailable] = useState(existingConstraint?.unavailable || false);
-  const [preference, setPreference] = useState(existingConstraint?.preference || 'אין העדפה');
+  const [preference, setPreference] = useState(existingConstraint?.preference || '');
   const [notes, setNotes] = useState(existingConstraint?.notes || '');
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <Switch checked={unavailable} onCheckedChange={setUnavailable} />
-        <Label>לא זמין בתאריך זה</Label>
+      <div className="bg-red-50 border-2 border-red-400 rounded-lg p-4 mb-4">
+        <div className="flex items-center gap-3">
+          <Switch 
+            checked={unavailable} 
+            onCheckedChange={setUnavailable}
+            className="data-[state=checked]:bg-red-600"
+          />
+          <div>
+            <Label className="text-lg font-bold text-red-700">לא זמין בתאריך זה</Label>
+            <p className="text-sm text-red-600 mt-1">סמן אם אינך זמין לעבוד בתאריך זה</p>
+          </div>
+        </div>
       </div>
 
       <div>
-        <Label>העדפה</Label>
+        <Label>העדפת משמרת (אופציונלי)</Label>
         <Select value={preference} onValueChange={setPreference}>
           <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="אין העדפה">אין העדפה</SelectItem>
-            <SelectItem value="מעדיף קצרה">מעדיף קצרה</SelectItem>
-            <SelectItem value="מעדיף ארוכה">מעדיף ארוכה</SelectItem>
+            <SelectItem value={null}>אין העדפה</SelectItem>
+            <SelectItem value="מעדיף מסיים ב-17:30">מעדיף מסיים ב-17:30</SelectItem>
+            <SelectItem value="מעדיף מסיים ב-19:00">מעדיף מסיים ב-19:00</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -313,7 +317,7 @@ function RangeConstraintForm({ onSave }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!startDate || !endDate) return;
-    onSave(startDate, endDate, { unavailable, preference: 'אין העדפה', notes });
+    onSave(startDate, endDate, { unavailable, preference: '', notes });
   };
 
   return (

@@ -18,8 +18,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const SHIFT_COLORS = {
-  'קצרה': 'bg-blue-200',
-  'ארוכה': 'bg-purple-200',
+  'מסיים ב-17:30': 'bg-blue-200',
+  'מסיים ב-19:00': 'bg-purple-200',
   'שישי קצר': 'bg-yellow-200',
   'שישי ארוך': 'bg-orange-200',
 };
@@ -78,12 +78,12 @@ function calculateShiftTimes(shiftType, contractType) {
   if (shiftType === 'שישי קצר') return { start: '08:30', end: '12:00' };
   if (shiftType === 'שישי ארוך') return { start: '08:00', end: '14:00' };
   
-  if (shiftType === 'קצרה') {
-    if (contractType === '08:00–17:00 / 10:00–19:00') return { start: '08:00', end: '17:00' };
-    if (contractType === '08:00–16:30 / 10:30–19:00') return { start: '08:00', end: '16:30' };
+  if (shiftType === 'מסיים ב-17:30') {
+    if (contractType === '08:00–17:00 / 10:00–19:00') return { start: '08:00', end: '17:30' };
+    if (contractType === '08:00–16:30 / 10:30–19:00') return { start: '08:00', end: '17:30' };
   }
   
-  if (shiftType === 'ארוכה') {
+  if (shiftType === 'מסיים ב-19:00') {
     if (contractType === '08:00–17:00 / 10:00–19:00') return { start: '10:00', end: '19:00' };
     if (contractType === '08:00–16:30 / 10:30–19:00') return { start: '10:30', end: '19:00' };
   }
@@ -322,11 +322,11 @@ EMPLOYEE LIMITS (STRICTLY ENFORCE):
    - Friday shifts COUNT toward this weekly limit
 6. MAXIMUM 1 Friday shift per employee per MONTH (either שישי קצר OR שישי ארוך, NOT both)
 7. NEVER assign the same employee to more than 2 shifts in any consecutive 7-day period
-8. AVOID assigning a Friday shift to an employee who worked Thursday ארוכה (long shift)
+8. AVOID assigning a Friday shift to an employee who worked Thursday "מסיים ב-19:00" (long shift)
 
 CONSTRAINTS:
 9. NEVER assign an employee who is unavailable (unavailable: true) on a specific date
-10. When possible, PREFER employees with matching preferences (e.g., "מעדיף קצרה" for קצרה shifts)
+10. When possible, PREFER employees with matching preferences (e.g., "מעדיף מסיים ב-17:30" for that shift type)
 
 WORKLOAD BALANCE:
 11. Distribute shifts EVENLY across all employees throughout the month
@@ -340,7 +340,7 @@ Before returning your schedule, verify EVERY item below:
 □ No employee is assigned to a date when they are marked as unavailable
 □ Every date has BOTH required shift types assigned
 □ Every shift has an employee assigned (no null/empty employee_id)
-□ No employee has both קצרה and ארוכה on the same day
+□ No employee has both shift types on the same day
 □ Workload is balanced - no employee has significantly more shifts than others
 □ No employee works Thursday ארוכה followed by Friday shift (if possible)
 
@@ -349,7 +349,7 @@ Return a JSON array with this EXACT structure:
 [
   {
     "date": "2026-02-01",
-    "shift_type": "קצרה",
+    "shift_type": "מסיים ב-17:30",
     "employee_id": "emp123",
     "reason": "Balanced assignment, employee available"
   },
@@ -550,6 +550,18 @@ Only return the JSON array, no additional text.`,
             >
               אשר סידור
             </Button>
+            <Button 
+              onClick={async () => {
+                if (confirm('האם אתה בטוח שברצונך למחוק את כל המשמרות לחודש הנוכחי?')) {
+                  const shiftsToDelete = allShifts.filter(s => s.date && s.date.startsWith(monthKey));
+                  await Promise.all(shiftsToDelete.map(shift => deleteShiftMutation.mutateAsync(shift.id)));
+                }
+              }}
+              variant="destructive"
+              disabled={allShifts.length === 0}
+            >
+              מחק כל המשמרות
+            </Button>
             <Button onClick={() => setCurrentDate(new Date(year, month - 2))} variant="outline">
               <ChevronRight className="w-5 h-5" />
             </Button>
@@ -641,8 +653,8 @@ Only return the JSON array, no additional text.`,
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">כל המשמרות</SelectItem>
-                    <SelectItem value="קצרה">קצרה</SelectItem>
-                    <SelectItem value="ארוכה">ארוכה</SelectItem>
+                    <SelectItem value="מסיים ב-17:30">מסיים ב-17:30</SelectItem>
+                    <SelectItem value="מסיים ב-19:00">מסיים ב-19:00</SelectItem>
                     <SelectItem value="שישי קצר">שישי קצר</SelectItem>
                     <SelectItem value="שישי ארוך">שישי ארוך</SelectItem>
                   </SelectContent>
@@ -708,8 +720,8 @@ function ShiftEditor({ selectedDate, shifts, employees, onDelete, onUpdate, onCr
               <SelectValue placeholder="בחר סוג משמרת..." />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="קצרה">קצרה</SelectItem>
-              <SelectItem value="ארוכה">ארוכה</SelectItem>
+              <SelectItem value="מסיים ב-17:30">מסיים ב-17:30</SelectItem>
+              <SelectItem value="מסיים ב-19:00">מסיים ב-19:00</SelectItem>
               <SelectItem value="שישי קצר">שישי קצר</SelectItem>
               <SelectItem value="שישי ארוך">שישי ארוך</SelectItem>
             </SelectContent>
@@ -813,8 +825,8 @@ function RecurringShiftForm({ employees, onCreate }) {
             <SelectValue placeholder="בחר סוג משמרת..." />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="קצרה">קצרה</SelectItem>
-            <SelectItem value="ארוכה">ארוכה</SelectItem>
+            <SelectItem value="מסיים ב-17:30">מסיים ב-17:30</SelectItem>
+            <SelectItem value="מסיים ב-19:00">מסיים ב-19:00</SelectItem>
             <SelectItem value="שישי קצר">שישי קצר</SelectItem>
             <SelectItem value="שישי ארוך">שישי ארוך</SelectItem>
           </SelectContent>

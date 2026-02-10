@@ -2,13 +2,17 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, getMonth, getYear, getDay, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, parseISO } from 'date-fns';
-import { ChevronLeft, ChevronRight, Sparkles, Users, LogOut, AlertCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Sparkles, Users, LogOut, AlertCircle, ArrowLeftRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/use-toast';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import MonthCalendar from '../components/shifts/MonthCalendar';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 
 const SHIFT_COLORS = {
   'קצרה': 'bg-blue-200',
@@ -45,6 +49,7 @@ export default function ManagerDashboard() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [swapDialogOpen, setSwapDialogOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -74,6 +79,13 @@ export default function ManagerDashboard() {
     },
   });
 
+  const { data: swapRequests = [] } = useQuery({
+    queryKey: ['swapRequests'],
+    queryFn: () => base44.entities.SwapRequest.list(),
+  });
+
+  const pendingSwaps = swapRequests.filter(req => req.status === 'ממתין לאישור');
+
   const deleteShiftMutation = useMutation({
     mutationFn: (id) => base44.entities.Shift.delete(id),
     onSuccess: () => {
@@ -88,6 +100,36 @@ export default function ManagerDashboard() {
       toast({ title: 'המשמרת עודכנה' });
     },
   });
+
+  const updateSwapMutation = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.SwapRequest.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['swapRequests']);
+      toast({ title: 'בקשת החלפה עודכנה' });
+    },
+  });
+
+  const handleApproveSwap = async (swapRequest) => {
+    const shift = shifts.find(s => s.id === swapRequest.shift_id);
+    if (!shift) return;
+
+    await updateShiftMutation.mutateAsync({
+      id: shift.id,
+      data: { ...shift, assigned_employee_id: swapRequest.target_employee_id }
+    });
+
+    await updateSwapMutation.mutateAsync({
+      id: swapRequest.id,
+      data: { status: 'אושר' }
+    });
+  };
+
+  const handleRejectSwap = async (swapRequest, managerNotes) => {
+    await updateSwapMutation.mutateAsync({
+      id: swapRequest.id,
+      data: { status: 'נדחה', manager_notes: managerNotes }
+    });
+  };
 
   const generateSchedule = async () => {
     setGenerating(true);
@@ -307,6 +349,10 @@ export default function ManagerDashboard() {
                 ניהול עובדים
               </Button>
             </Link>
+            <Button onClick={() => setSwapDialogOpen(true)} variant="outline">
+              <ArrowLeftRight className="w-4 h-4 ml-2" />
+              בקשות החלפה {pendingSwaps.length > 0 && `(${pendingSwaps.length})`}
+            </Button>
             <Button onClick={generateSchedule} disabled={generating}>
               <Sparkles className="w-4 h-4 ml-2" />
               {generating ? 'יוצר...' : 'צור סקיצת משמרות'}
@@ -360,7 +406,127 @@ export default function ManagerDashboard() {
             </div>
           </DialogContent>
         </Dialog>
+
+        <Dialog open={swapDialogOpen} onOpenChange={setSwapDialogOpen}>
+          <DialogContent dir="rtl" className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>ניהול בקשות החלפת משמרות</DialogTitle>
+            </DialogHeader>
+            <SwapRequestsManager
+              swapRequests={swapRequests}
+              shifts={shifts}
+              employees={employees}
+              onApprove={handleApproveSwap}
+              onReject={handleRejectSwap}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
+    </div>
+  );
+}
+
+function SwapRequestsManager({ swapRequests, shifts, employees, onApprove, onReject }) {
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [rejectNotes, setRejectNotes] = useState('');
+
+  const pendingRequests = swapRequests.filter(req => req.status === 'ממתין לאישור');
+
+  return (
+    <div className="space-y-4">
+      {pendingRequests.length === 0 ? (
+        <p className="text-center text-gray-500 py-8">אין בקשות החלפה ממתינות</p>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-right">משמרת</TableHead>
+              <TableHead className="text-right">עובד מבקש</TableHead>
+              <TableHead className="text-right">עובד מוצע</TableHead>
+              <TableHead className="text-right">הערות</TableHead>
+              <TableHead className="text-right">פעולות</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {pendingRequests.map((req) => {
+              const shift = shifts.find(s => s.id === req.shift_id);
+              const requestingEmp = employees.find(e => e.id === req.requesting_employee_id);
+              const targetEmp = employees.find(e => e.id === req.target_employee_id);
+              return (
+                <TableRow key={req.id}>
+                  <TableCell>
+                    {shift ? (
+                      <div>
+                        <div className="font-medium">{format(new Date(shift.date), 'dd/MM/yyyy')}</div>
+                        <div className="text-sm text-gray-600">{shift.shift_type}</div>
+                        <div className="text-xs text-gray-500">{shift.start_time} - {shift.end_time}</div>
+                      </div>
+                    ) : '-'}
+                  </TableCell>
+                  <TableCell>{requestingEmp?.full_name}</TableCell>
+                  <TableCell>{targetEmp?.full_name}</TableCell>
+                  <TableCell className="max-w-xs">
+                    <p className="text-sm">{req.notes || '-'}</p>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => onApprove(req)}
+                      >
+                        אשר
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => setSelectedRequest(req)}
+                      >
+                        דחה
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      )}
+
+      {selectedRequest && (
+        <Dialog open={!!selectedRequest} onOpenChange={() => setSelectedRequest(null)}>
+          <DialogContent dir="rtl">
+            <DialogHeader>
+              <DialogTitle>דחיית בקשת החלפה</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>סיבת הדחייה (אופציונלי)</Label>
+                <Textarea
+                  value={rejectNotes}
+                  onChange={(e) => setRejectNotes(e.target.value)}
+                  placeholder="הסבר קצר לסיבת הדחייה..."
+                  rows={3}
+                />
+              </div>
+              <div className="flex gap-3 justify-end">
+                <Button variant="outline" onClick={() => setSelectedRequest(null)}>
+                  ביטול
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    onReject(selectedRequest, rejectNotes);
+                    setSelectedRequest(null);
+                    setRejectNotes('');
+                  }}
+                >
+                  דחה בקשה
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

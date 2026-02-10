@@ -166,6 +166,9 @@ export default function EmployeeConstraints() {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">{currentEmployee.full_name} - אילוצים והעדפות</h1>
           <div className="flex gap-2">
+            <Link to={createPageUrl('EmployeeSwaps')}>
+              <Button variant="outline">החלפת משמרות</Button>
+            </Link>
             <Button onClick={() => setRangeDialogOpen(true)} variant="default">
               <Calendar className="w-4 h-4 ml-2" />
               בקשת חופשה/יציאה

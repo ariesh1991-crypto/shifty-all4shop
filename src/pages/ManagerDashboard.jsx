@@ -352,6 +352,7 @@ export default function ManagerDashboard() {
           employee: emp,
           weeklyShifts: {}, // { weekNum: count }
           weeklyShiftTypes: {}, // { weekNum: [shift_types] }
+          assignedDates: new Set(), // תאריכים שבהם העובד כבר משובץ
           fridayCount: 0,
           totalShifts: 0,
         };
@@ -375,6 +376,9 @@ export default function ManagerDashboard() {
         const weekNum = getWeekNum(date);
         const dateStr = format(date, 'yyyy-MM-dd');
         const isFridayShift = shiftType.includes('שישי');
+
+        // בדוק שהעובד לא כבר משובץ באותו יום
+        if (stats.assignedDates.has(dateStr)) return false;
 
         // בדוק זמינות
         if (!isEmployeeAvailable(empId, dateStr)) return false;
@@ -401,8 +405,10 @@ export default function ManagerDashboard() {
       const assignShift = (empId, date, shiftType) => {
         const stats = employeeStats[empId];
         const weekNum = getWeekNum(date);
+        const dateStr = format(date, 'yyyy-MM-dd');
         const isFridayShift = shiftType.includes('שישי');
 
+        stats.assignedDates.add(dateStr);
         stats.weeklyShifts[weekNum] = (stats.weeklyShifts[weekNum] || 0) + 1;
         
         if (!stats.weeklyShiftTypes[weekNum]) {

@@ -17,7 +17,9 @@ import { createPageUrl } from '../utils';
 export default function ManageEmployees() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [quickLinkDialogOpen, setQuickLinkDialogOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [selectedUser, setSelectedUser] = useState(null);
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterActive, setFilterActive] = useState('all');
@@ -43,8 +45,18 @@ export default function ManageEmployees() {
 
   const createMutation = useMutation({
     mutationFn: (data) => base44.entities.Employee.create(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['employees']);
+    onSuccess: async (newEmployee) => {
+      await queryClient.invalidateQueries(['employees']);
+      
+      // אם יש משתמש שממתין לחיבור, חבר אותו אוטומטית
+      if (selectedUser) {
+        await linkUserMutation.mutateAsync({
+          employeeId: newEmployee.id,
+          userId: selectedUser.id
+        });
+        setSelectedUser(null);
+      }
+      
       toast({ title: 'עובד נוסף בהצלחה' });
       setDialogOpen(false);
       resetForm();
@@ -169,15 +181,18 @@ export default function ManageEmployees() {
                           size="lg"
                           onClick={() => {
                             const matchingEmp = employees.find(e => 
-                              e.full_name.toLowerCase().includes(user.full_name?.toLowerCase() || '')
+                              !e.user_id && e.full_name.toLowerCase() === (user.full_name?.toLowerCase() || '')
                             );
                             if (matchingEmp) {
+                              // התאמה מדויקת - חבר מיד
                               linkUserMutation.mutate({ 
                                 employeeId: matchingEmp.id, 
                                 userId: user.id 
                               });
                             } else {
-                              alert('לא נמצא עובד מתאים. צור תחילה רשומת עובד עבור ' + user.full_name);
+                              // אין התאמה מדויקת - פתח דיאלוג עם אפשרויות
+                              setSelectedUser(user);
+                              setQuickLinkDialogOpen(true);
                             }
                           }}
                           className="bg-green-600 hover:bg-green-700"
@@ -188,6 +203,7 @@ export default function ManageEmployees() {
                           size="lg"
                           variant="outline"
                           onClick={() => {
+                            setSelectedUser(user);
                             setFormData({
                               full_name: user.full_name || user.email,
                               active: true,
@@ -375,6 +391,90 @@ export default function ManageEmployees() {
                 {users.filter(u => !employees.some(e => e.user_id === u.id)).length === 0 && (
                   <p className="text-sm text-gray-500 text-center py-4">אין משתמשים זמינים לחיבור</p>
                 )}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={quickLinkDialogOpen} onOpenChange={setQuickLinkDialogOpen}>
+          <DialogContent dir="rtl" className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>חיבור משתמש: {selectedUser?.full_name}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-6">
+              <p className="text-gray-700">
+                לא נמצאה התאמה אוטומטית לעובד קיים. בחר אחת מהאפשרויות הבאות:
+              </p>
+
+              <div className="space-y-4">
+                <div className="border-2 border-blue-300 rounded-lg p-4 bg-blue-50">
+                  <h3 className="font-bold text-lg mb-2">אפשרות 1: צור רשומת עובד חדשה</h3>
+                  <p className="text-sm text-gray-600 mb-3">
+                    יצירת רשומת עובד חדשה עם הפרטים של {selectedUser?.full_name} וחיבור אוטומטי למשתמש
+                  </p>
+                  <Button 
+                    className="w-full"
+                    onClick={() => {
+                      setFormData({
+                        full_name: selectedUser.full_name || selectedUser.email,
+                        active: true,
+                        contract_type: '08:00–17:00 / 10:00–19:00',
+                        notes: '',
+                      });
+                      setQuickLinkDialogOpen(false);
+                      setDialogOpen(true);
+                    }}
+                  >
+                    צור עובד חדש וחבר אוטומטית
+                  </Button>
+                </div>
+
+                <div className="border-2 border-green-300 rounded-lg p-4 bg-green-50">
+                  <h3 className="font-bold text-lg mb-2">אפשרות 2: חבר לעובד קיים</h3>
+                  <p className="text-sm text-gray-600 mb-3">בחר עובד מהרשימה לחיבור ידני:</p>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {employees.filter(e => !e.user_id).length === 0 ? (
+                      <p className="text-sm text-gray-500 text-center py-4">
+                        אין עובדים ללא משתמש מקושר
+                      </p>
+                    ) : (
+                      employees.filter(e => !e.user_id).map(emp => (
+                        <Button
+                          key={emp.id}
+                          variant="outline"
+                          className="w-full justify-start"
+                          onClick={() => {
+                            linkUserMutation.mutate({ 
+                              employeeId: emp.id, 
+                              userId: selectedUser.id 
+                            });
+                            setQuickLinkDialogOpen(false);
+                            setSelectedUser(null);
+                          }}
+                        >
+                          <div className="text-right">
+                            <div className="font-medium">{emp.full_name}</div>
+                            <div className="text-sm text-gray-500">
+                              {emp.contract_type} • {emp.active ? 'פעיל' : 'לא פעיל'}
+                            </div>
+                          </div>
+                        </Button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setQuickLinkDialogOpen(false);
+                    setSelectedUser(null);
+                  }}
+                >
+                  ביטול
+                </Button>
               </div>
             </div>
           </DialogContent>

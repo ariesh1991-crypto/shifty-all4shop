@@ -689,9 +689,38 @@ export default function ManagerDashboard() {
       <div
         key={date.toString()}
         onClick={() => { setSelectedDate(dateStr); setDialogOpen(true); }}
-        className={`p-2 border-2 rounded-lg cursor-pointer hover:shadow-md min-h-[100px] ${isFriday ? 'bg-blue-50' : 'bg-white'}`}
+        className={`p-2 border-2 rounded-lg cursor-pointer hover:shadow-md min-h-[100px] ${
+          employeesOnVacation.length > 0 ? 'bg-green-50 border-green-300' : 
+          isFriday ? 'bg-blue-50' : 'bg-white'
+        }`}
       >
         <div className="font-bold text-center mb-2">{dayNumber}</div>
+        
+        {/* הצג עובדים בחופש בראש היום */}
+        {employeesOnVacation.length > 0 && (
+          <div className="space-y-1 mb-2">
+            {employeesOnVacation.map(emp => {
+              const vacation = vacationRequests.find(v => 
+                v.employee_id === emp.id &&
+                v.status === 'אושר' &&
+                dateStr >= v.start_date && 
+                dateStr <= v.end_date
+              );
+              return (
+                <div key={`vacation-${emp.id}`} className="text-xs p-1 rounded bg-green-200 border-2 border-green-600">
+                  <div className="font-bold text-green-900 flex items-center gap-1">
+                    🏖️ {emp.full_name}
+                  </div>
+                  <div className="text-green-800 text-[10px] font-bold">{vacation.type}</div>
+                  {vacation.notes && (
+                    <div className="text-[9px] text-green-700 mt-1">{vacation.notes}</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        
         <div className="space-y-1">
           {expectedShiftTypes.map(expectedType => {
             const shift = dayShifts.find(s => s.shift_type === expectedType);
@@ -747,27 +776,6 @@ export default function ManagerDashboard() {
                   <div className="text-[9px] text-red-600 font-bold mt-1">
                     {vacation ? `חופש: ${vacation.type}` : constraint?.notes || 'לא זמין'}
                   </div>
-                )}
-              </div>
-            );
-          })}
-          
-          {/* הצג עובדים בחופש */}
-          {employeesOnVacation.map(emp => {
-            const vacation = vacationRequests.find(v => 
-              v.employee_id === emp.id &&
-              v.status === 'אושר' &&
-              dateStr >= v.start_date && 
-              dateStr <= v.end_date
-            );
-            return (
-              <div key={`vacation-${emp.id}`} className="text-xs p-1 rounded bg-green-100 border-2 border-green-500">
-                <div className="font-medium text-green-800 flex items-center gap-1">
-                  ✓ {emp.full_name}
-                </div>
-                <div className="text-green-700 text-[10px] font-bold">{vacation.type}</div>
-                {vacation.notes && (
-                  <div className="text-[9px] text-green-600 mt-1">{vacation.notes}</div>
                 )}
               </div>
             );

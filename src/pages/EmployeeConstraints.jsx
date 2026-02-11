@@ -451,6 +451,7 @@ function RangeConstraintForm({ onSave }) {
           type="date"
           value={startDate}
           onChange={(e) => setStartDate(e.target.value)}
+          placeholder="dd/mm/yyyy"
           required
         />
       </div>
@@ -461,6 +462,7 @@ function RangeConstraintForm({ onSave }) {
           type="date"
           value={endDate}
           onChange={(e) => setEndDate(e.target.value)}
+          placeholder="dd/mm/yyyy"
           required
         />
       </div>

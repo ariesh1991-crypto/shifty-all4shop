@@ -808,10 +808,8 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
     const employeesOnVacation = employees.filter(emp => {
       return vacationRequests.some(v => {
         if (v.employee_id !== emp.id || v.status !== 'אושר') return false;
-        const vStart = new Date(v.start_date);
-        const vEnd = new Date(v.end_date);
-        const current = new Date(dateStr);
-        return current >= vStart && current <= vEnd;
+        // השווה תאריכים כ-strings
+        return dateStr >= v.start_date && dateStr <= v.end_date;
       });
     });
 
@@ -825,10 +823,7 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
       const constraint = constraints.find(c => c.employee_id === shift.assigned_employee_id && c.date === dateStr);
       const vacation = vacationRequests.find(v => {
         if (v.employee_id !== shift.assigned_employee_id || v.status !== 'אושר') return false;
-        const vStart = new Date(v.start_date);
-        const vEnd = new Date(v.end_date);
-        const current = new Date(dateStr);
-        return current >= vStart && current <= vEnd;
+        return dateStr >= v.start_date && dateStr <= v.end_date;
       });
       return (constraint?.unavailable) || vacation;
     });
@@ -882,10 +877,7 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
             {employeesOnVacation.slice(0, isDense ? 1 : 3).map(emp => {
               const vacation = vacationRequests.find(v => {
                 if (v.employee_id !== emp.id || v.status !== 'אושר') return false;
-                const vStart = new Date(v.start_date);
-                const vEnd = new Date(v.end_date);
-                const current = new Date(dateStr);
-                return current >= vStart && current <= vEnd;
+                return dateStr >= v.start_date && dateStr <= v.end_date;
               });
               return (
                 <div key={`vacation-${emp.id}`} className="text-xs p-1 rounded bg-green-200 border-2 border-green-600">
@@ -938,10 +930,7 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
             const constraint = constraints.find(c => c.employee_id === shift.assigned_employee_id && c.date === dateStr);
             const vacation = vacationRequests.find(v => {
               if (v.employee_id !== shift.assigned_employee_id || v.status !== 'אושר') return false;
-              const vStart = new Date(v.start_date);
-              const vEnd = new Date(v.end_date);
-              const current = new Date(dateStr);
-              return current >= vStart && current <= vEnd;
+              return dateStr >= v.start_date && dateStr <= v.end_date;
             });
             
             const hasConflict = (constraint?.unavailable) || vacation;

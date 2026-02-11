@@ -5,21 +5,24 @@ export default function Layout({ children }) {
     <div className="min-h-screen bg-gray-50" dir="rtl">
       <style>
         {`
+          input[type="date"] {
+            direction: ltr !important;
+            text-align: right;
+          }
           input[type="date"]::-webkit-datetime-edit-fields-wrapper {
-            display: flex;
-            flex-direction: row-reverse;
+            direction: ltr;
+          }
+          input[type="date"]::-webkit-datetime-edit {
+            direction: ltr;
           }
           input[type="date"]::-webkit-datetime-edit-day-field {
-            order: 3;
+            direction: ltr;
           }
           input[type="date"]::-webkit-datetime-edit-month-field {
-            order: 2;
+            direction: ltr;
           }
           input[type="date"]::-webkit-datetime-edit-year-field {
-            order: 1;
-          }
-          input[type="date"]::-webkit-datetime-edit-text {
-            order: 2;
+            direction: ltr;
           }
         `}
       </style>

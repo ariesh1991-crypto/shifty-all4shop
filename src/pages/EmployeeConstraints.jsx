@@ -223,6 +223,11 @@ export default function EmployeeConstraints() {
               <Calendar className="w-4 h-4 ml-2" />
               סימון ימים מרובים
             </Button>
+            <Link to={createPageUrl('RecurringConstraints')}>
+              <Button variant="outline">
+                🔄 אילוצים חוזרים
+              </Button>
+            </Link>
             <Button 
               onClick={async () => {
                 if (confirm('האם אתה בטוח שברצונך למחוק את כל האילוצים שלך?')) {

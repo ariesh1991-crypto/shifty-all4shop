@@ -155,6 +155,11 @@ export default function ManagerDashboard() {
     },
   });
 
+  const { data: recurringConstraints = [] } = useQuery({
+    queryKey: ['recurringConstraints'],
+    queryFn: () => base44.entities.RecurringConstraint.list(),
+  });
+
   const { data: swapRequests = [] } = useQuery({
     queryKey: ['swapRequests'],
     queryFn: () => base44.entities.SwapRequest.list(),
@@ -368,7 +373,17 @@ export default function ManagerDashboard() {
       // פונקציה לבדוק אם עובד זמין
       const isEmployeeAvailable = (empId, dateStr) => {
         const constraint = constraints.find(c => c.employee_id === empId && c.date === dateStr);
-        return !constraint || !constraint.unavailable;
+        if (constraint?.unavailable) return false;
+        
+        // בדוק אילוצים חוזרים
+        const date = new Date(dateStr);
+        const dayOfWeek = getDay(date);
+        const recurringConstraint = recurringConstraints.find(
+          rc => rc.employee_id === empId && rc.day_of_week === dayOfWeek && rc.unavailable
+        );
+        if (recurringConstraint) return false;
+        
+        return true;
       };
 
       // פונקציה לבדוק אם עובד יכול לקבל משמרת
@@ -738,6 +753,37 @@ export default function ManagerDashboard() {
               <ArrowLeftRight className="w-4 h-4 ml-2" />
               בקשות החלפה {pendingSwaps.length > 0 && `(${pendingSwaps.length})`}
             </Button>
+            {pendingSwaps.length > 0 && (
+              <Button 
+                onClick={async () => {
+                  const reason = prompt('הסבר (אופציונלי) לדחיית כל הבקשות:');
+                  if (reason !== null) {
+                    for (const req of pendingSwaps) {
+                      await updateSwapMutation.mutateAsync({
+                        id: req.id,
+                        data: { status: 'נדחה', manager_notes: reason || 'כל הבקשות נדחו' }
+                      });
+                      const requestingEmployee = employees.find(e => e.id === req.requesting_employee_id);
+                      if (requestingEmployee?.user_id) {
+                        await base44.entities.Notification.create({
+                          user_id: requestingEmployee.user_id,
+                          employee_id: requestingEmployee.id,
+                          type: 'swap_rejected',
+                          title: 'בקשת החלפה נדחתה',
+                          message: reason || 'בקשת ההחלפה שלך נדחתה על ידי המנהל',
+                          swap_request_id: req.id,
+                        });
+                      }
+                    }
+                    toast({ title: `נדחו ${pendingSwaps.length} בקשות החלפה` });
+                  }
+                }}
+                variant="destructive"
+                size="sm"
+              >
+                דחה הכל
+              </Button>
+            )}
             <Button 
               onClick={generateSchedule} 
               disabled={generating}

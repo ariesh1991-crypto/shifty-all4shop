@@ -675,6 +675,16 @@ export default function ManagerDashboard() {
       ? ['שישי קצר', 'שישי ארוך']
       : ['מסיים ב-17:30', 'מסיים ב-19:00'];
 
+    // מצא עובדים בחופש מאושר באותו יום
+    const employeesOnVacation = employees.filter(emp => {
+      return vacationRequests.some(v => 
+        v.employee_id === emp.id &&
+        v.status === 'אושר' &&
+        dateStr >= v.start_date && 
+        dateStr <= v.end_date
+      );
+    });
+
     return (
       <div
         key={date.toString()}
@@ -737,6 +747,27 @@ export default function ManagerDashboard() {
                   <div className="text-[9px] text-red-600 font-bold mt-1">
                     {vacation ? `חופש: ${vacation.type}` : constraint?.notes || 'לא זמין'}
                   </div>
+                )}
+              </div>
+            );
+          })}
+          
+          {/* הצג עובדים בחופש */}
+          {employeesOnVacation.map(emp => {
+            const vacation = vacationRequests.find(v => 
+              v.employee_id === emp.id &&
+              v.status === 'אושר' &&
+              dateStr >= v.start_date && 
+              dateStr <= v.end_date
+            );
+            return (
+              <div key={`vacation-${emp.id}`} className="text-xs p-1 rounded bg-green-100 border-2 border-green-500">
+                <div className="font-medium text-green-800 flex items-center gap-1">
+                  ✓ {emp.full_name}
+                </div>
+                <div className="text-green-700 text-[10px] font-bold">{vacation.type}</div>
+                {vacation.notes && (
+                  <div className="text-[9px] text-green-600 mt-1">{vacation.notes}</div>
                 )}
               </div>
             );

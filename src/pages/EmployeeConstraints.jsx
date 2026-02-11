@@ -266,12 +266,6 @@ export default function EmployeeConstraints() {
           <h1 className="text-3xl font-bold">{currentEmployee.full_name} - אילוצים והעדפות</h1>
           <div className="flex gap-2 flex-wrap">
             {currentUser && <NotificationBell userId={currentUser.id} />}
-            <Link to={createPageUrl('TeamVacations')}>
-              <Button variant="outline" className="bg-green-50 border-green-300 hover:bg-green-100">
-                <Users className="w-4 h-4 ml-2" />
-                חופשות הצוות
-              </Button>
-            </Link>
             <Link to={createPageUrl('EmployeeShifts')}>
               <Button variant="outline">המשמרות שלי</Button>
             </Link>

@@ -17,6 +17,10 @@ import { useToast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import MonthCalendar from '../components/shifts/MonthCalendar';
+import CalendarViewToggle from '../components/shifts/CalendarViewToggle';
+import WeekCalendar from '../components/shifts/WeekCalendar';
+import AgendaView from '../components/shifts/AgendaView';
+import { AlertTriangle } from 'lucide-react';
 
 export default function EmployeeConstraints() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -26,6 +30,7 @@ export default function EmployeeConstraints() {
   const [rangeDialogOpen, setRangeDialogOpen] = useState(false);
   const [vacationDialogOpen, setVacationDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [calendarView, setCalendarView] = useState('month');
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -144,26 +149,33 @@ export default function EmployeeConstraints() {
     });
   };
 
-  const renderDay = (date) => {
-    const dayOfWeek = getDay(date);
-    if (dayOfWeek === 6) return null;
-
-    const dateStr = format(date, 'yyyy-MM-dd');
+  const getConstraintsForDate = (dateStr) => {
     const constraint = constraints.find(c => c.date === dateStr);
-    const dayNumber = format(date, 'd');
-    
-    // בדוק אם יש חופש מאושר בתאריך זה
     const approvedVacation = vacationRequests.find(v => 
       v.status === 'אושר' && 
       dateStr >= v.start_date && 
       dateStr <= v.end_date
     );
+    return { constraint, approvedVacation };
+  };
+
+  const renderDay = (date) => {
+    const dayOfWeek = getDay(date);
+    if (dayOfWeek === 6) return null;
+
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const { constraint, approvedVacation } = getConstraintsForDate(dateStr);
+    const dayNumber = format(date, 'd');
+    
+    // Count items for density indicator
+    const itemCount = (constraint ? 1 : 0) + (approvedVacation ? 1 : 0);
+    const hasMultipleItems = itemCount > 1;
 
     return (
       <div
         key={date.toString()}
         onClick={() => { setSelectedDate(dateStr); setDialogOpen(true); }}
-        className={`p-3 border-2 rounded-lg cursor-pointer hover:shadow-md min-h-[80px] ${
+        className={`p-3 border-2 rounded-lg cursor-pointer hover:shadow-md min-h-[80px] relative ${
           approvedVacation ? 'bg-green-100 border-green-500' :
           constraint?.unavailable ? 'bg-red-100 border-red-400' :
           constraint?.preference === 'מעדיף לסיים ב-17:30' ? 'bg-blue-100 border-blue-400' :
@@ -171,20 +183,28 @@ export default function EmployeeConstraints() {
           'bg-white'
         }`}
       >
+        {hasMultipleItems && (
+          <div className="absolute top-1 left-1">
+            <AlertTriangle className="w-3 h-3 text-amber-600" />
+          </div>
+        )}
         <div className="font-bold text-center mb-2">{dayNumber}</div>
-        {approvedVacation ? (
-          <div className="text-xs text-center space-y-1">
-            <div className="font-bold text-green-700">✓ {approvedVacation.type}</div>
-            <div className="text-green-600 text-[10px]">מאושר</div>
-          </div>
-        ) : constraint ? (
-          <div className="text-xs text-center space-y-1">
-            {constraint.unavailable && <div className="font-bold text-red-600">לא זמין</div>}
-            {constraint.preference && (
-              <div className="text-gray-700">{constraint.preference}</div>
-            )}
-          </div>
-        ) : null}
+        <div className="space-y-1">
+          {approvedVacation && (
+            <div className="text-xs text-center">
+              <div className="font-bold text-green-700">✓ {approvedVacation.type}</div>
+              <div className="text-green-600 text-[10px]">מאושר</div>
+            </div>
+          )}
+          {constraint && (
+            <div className="text-xs text-center">
+              {constraint.unavailable && <div className="font-bold text-red-600">לא זמין</div>}
+              {constraint.preference && (
+                <div className="text-gray-700 text-[10px]">{constraint.preference}</div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     );
   };
@@ -285,28 +305,75 @@ export default function EmployeeConstraints() {
         )}
 
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-          <h3 className="font-bold mb-2">מקרא:</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded bg-green-100 border-2 border-green-500"></div>
-              <span className="text-sm">חופש מאושר</span>
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <h3 className="font-bold mb-2">מקרא:</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded bg-green-100 border-2 border-green-500"></div>
+                  <span className="text-sm">חופש מאושר</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded bg-red-100 border-2 border-red-400"></div>
+                  <span className="text-sm">לא זמין</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded bg-blue-100 border-2 border-blue-400"></div>
+                  <span className="text-sm">מעדיף לסיים ב-17:30</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded bg-purple-100 border-2 border-purple-400"></div>
+                  <span className="text-sm">מעדיף לסיים ב-19:00</span>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded bg-red-100 border-2 border-red-400"></div>
-              <span className="text-sm">לא זמין</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded bg-blue-100 border-2 border-blue-400"></div>
-              <span className="text-sm">מעדיף לסיים ב-17:30</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded bg-purple-100 border-2 border-purple-400"></div>
-              <span className="text-sm">מעדיף לסיים ב-19:00</span>
-            </div>
+            <CalendarViewToggle view={calendarView} onViewChange={setCalendarView} />
           </div>
         </div>
 
-        <MonthCalendar year={year} month={month} renderDay={renderDay} />
+        {calendarView === 'month' && <MonthCalendar year={year} month={month} renderDay={renderDay} />}
+        
+        {calendarView === 'week' && (
+          <WeekCalendar 
+            currentDate={currentDate} 
+            onDateChange={setCurrentDate}
+            renderDay={renderDay}
+          />
+        )}
+        
+        {calendarView === 'agenda' && (
+          <AgendaView
+            currentDate={currentDate}
+            items={constraints.concat(vacationRequests.filter(v => v.status === 'אושר'))}
+            getItemsForDate={(dateStr) => {
+              const { constraint, approvedVacation } = getConstraintsForDate(dateStr);
+              const items = [];
+              if (approvedVacation) items.push({ type: 'vacation', data: approvedVacation });
+              if (constraint) items.push({ type: 'constraint', data: constraint });
+              return items;
+            }}
+            renderItem={(item, idx) => (
+              <div key={idx} className={`p-2 rounded-lg text-sm ${
+                item.type === 'vacation' ? 'bg-green-100 border border-green-500' :
+                item.data.unavailable ? 'bg-red-100 border border-red-400' :
+                'bg-blue-100 border border-blue-400'
+              }`}>
+                {item.type === 'vacation' ? (
+                  <div>
+                    <div className="font-bold text-green-700">✓ {item.data.type}</div>
+                    <div className="text-green-600 text-xs">מאושר</div>
+                  </div>
+                ) : (
+                  <div>
+                    {item.data.unavailable && <div className="font-bold text-red-600">לא זמין</div>}
+                    {item.data.preference && <div className="text-gray-700 text-xs">{item.data.preference}</div>}
+                    {item.data.notes && <div className="text-gray-600 text-xs mt-1">{item.data.notes}</div>}
+                  </div>
+                )}
+              </div>
+            )}
+          />
+        )}
 
         <div className="mt-6 bg-white rounded-lg shadow-md p-6">
           <h3 className="font-bold text-lg mb-4">היסטוריית בקשות חופשה</h3>

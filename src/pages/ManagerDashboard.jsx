@@ -11,6 +11,9 @@ import { useToast } from '@/components/ui/use-toast';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import MonthCalendar from '../components/shifts/MonthCalendar';
+import CalendarViewToggle from '../components/shifts/CalendarViewToggle';
+import WeekCalendar from '../components/shifts/WeekCalendar';
+import AgendaView from '../components/shifts/AgendaView';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
@@ -77,6 +80,7 @@ export default function ManagerDashboard() {
   const [filterEmployee, setFilterEmployee] = useState('all');
   const [filterShiftType, setFilterShiftType] = useState('all');
   const [scheduleAlerts, setScheduleAlerts] = useState([]);
+  const [calendarView, setCalendarView] = useState('month');
   const [advancedSettings, setAdvancedSettings] = useState({
     priorityEmployees: [],
     avoidShiftTypes: [],
@@ -685,21 +689,49 @@ export default function ManagerDashboard() {
       );
     });
 
+    // ספירת צפיפות - משמרות + חופשים
+    const totalItems = dayShifts.length + employeesOnVacation.length;
+    const isDense = totalItems > 3;
+    const hasConflicts = dayShifts.some(shift => {
+      const constraint = constraints.find(c => c.employee_id === shift.assigned_employee_id && c.date === dateStr);
+      const vacation = vacationRequests.find(v => 
+        v.employee_id === shift.assigned_employee_id && 
+        v.status === 'אושר' &&
+        dateStr >= v.start_date && 
+        dateStr <= v.end_date
+      );
+      return (constraint?.unavailable) || vacation;
+    });
+
     return (
       <div
         key={date.toString()}
         onClick={() => { setSelectedDate(dateStr); setDialogOpen(true); }}
-        className={`p-2 border-2 rounded-lg cursor-pointer hover:shadow-md min-h-[100px] ${
+        className={`p-2 border-2 rounded-lg cursor-pointer hover:shadow-md min-h-[100px] relative ${
+          hasConflicts ? 'ring-2 ring-red-500 ring-offset-1' :
+          isDense ? 'ring-2 ring-amber-400 ring-offset-1' : ''
+        } ${
           employeesOnVacation.length > 0 ? 'bg-green-50 border-green-300' : 
           isFriday ? 'bg-blue-50' : 'bg-white'
         }`}
       >
+        {(isDense || hasConflicts) && (
+          <div className="absolute top-1 left-1 flex gap-1">
+            {hasConflicts && (
+              <div className="w-2 h-2 rounded-full bg-red-500" title="קונפליקטים"></div>
+            )}
+            {isDense && (
+              <div className="w-2 h-2 rounded-full bg-amber-500" title="צפיפות גבוהה"></div>
+            )}
+          </div>
+        )}
+        
         <div className="font-bold text-center mb-2">{dayNumber}</div>
         
-        {/* הצג עובדים בחופש בראש היום */}
+        {/* הצג עובדים בחופש בראש היום - מקוצר אם יש צפיפות */}
         {employeesOnVacation.length > 0 && (
           <div className="space-y-1 mb-2">
-            {employeesOnVacation.map(emp => {
+            {employeesOnVacation.slice(0, isDense ? 1 : 3).map(emp => {
               const vacation = vacationRequests.find(v => 
                 v.employee_id === emp.id &&
                 v.status === 'אושר' &&
@@ -718,11 +750,16 @@ export default function ManagerDashboard() {
                 </div>
               );
             })}
+            {employeesOnVacation.length > (isDense ? 1 : 3) && (
+              <div className="text-[10px] text-center text-green-700 font-bold">
+                +{employeesOnVacation.length - (isDense ? 1 : 3)} נוספים
+              </div>
+            )}
           </div>
         )}
         
         <div className="space-y-1">
-          {expectedShiftTypes.map(expectedType => {
+          {expectedShiftTypes.slice(0, isDense ? 1 : 2).map(expectedType => {
             const shift = dayShifts.find(s => s.shift_type === expectedType);
             const employee = shift ? employees.find(e => e.id === shift.assigned_employee_id) : null;
 
@@ -780,6 +817,11 @@ export default function ManagerDashboard() {
               </div>
             );
           })}
+          {isDense && expectedShiftTypes.length > 1 && (
+            <div className="text-[10px] text-center text-gray-600 font-bold">
+              +{expectedShiftTypes.length - 1} משמרות
+            </div>
+          )}
         </div>
       </div>
     );
@@ -964,7 +1006,44 @@ export default function ManagerDashboard() {
           </div>
         )}
 
-        <MonthCalendar year={year} month={month} renderDay={renderDay} />
+        <div className="mb-4 flex justify-end">
+          <CalendarViewToggle view={calendarView} onViewChange={setCalendarView} />
+        </div>
+
+        {calendarView === 'month' && <MonthCalendar year={year} month={month} renderDay={renderDay} />}
+        
+        {calendarView === 'week' && (
+          <WeekCalendar 
+            currentDate={currentDate} 
+            onDateChange={setCurrentDate}
+            renderDay={renderDay}
+          />
+        )}
+        
+        {calendarView === 'agenda' && (
+          <AgendaView
+            currentDate={currentDate}
+            items={shifts}
+            getItemsForDate={(dateStr) => shifts.filter(s => s.date === dateStr)}
+            renderItem={(shift, idx) => {
+              const employee = employees.find(e => e.id === shift.assigned_employee_id);
+              const hasConflict = constraints.find(c => c.employee_id === shift.assigned_employee_id && c.date === shift.date && c.unavailable);
+              return (
+                <div key={idx} className={`p-2 rounded-lg text-sm border-2 ${
+                  SHIFT_COLORS[shift.shift_type]
+                } ${STATUS_COLORS[shift.status]} ${
+                  hasConflict ? 'ring-2 ring-red-500' : ''
+                }`}>
+                  <div className="font-bold">{shift.shift_type}</div>
+                  <div className="text-gray-700">{employee?.full_name || 'לא משובץ'}</div>
+                  {shift.start_time && shift.end_time && (
+                    <div className="text-xs text-gray-600">{shift.start_time}–{shift.end_time}</div>
+                  )}
+                </div>
+              );
+            }}
+          />
+        )}
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContent dir="rtl" className="max-w-2xl">

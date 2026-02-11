@@ -510,6 +510,7 @@ function VacationRequestForm({ onSave }) {
           type="date"
           value={startDate}
           onChange={(e) => setStartDate(e.target.value)}
+          placeholder="dd/mm/yyyy"
           required
         />
       </div>
@@ -520,6 +521,7 @@ function VacationRequestForm({ onSave }) {
           type="date"
           value={endDate}
           onChange={(e) => setEndDate(e.target.value)}
+          placeholder="dd/mm/yyyy"
           required
         />
       </div>

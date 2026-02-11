@@ -32,6 +32,8 @@ export default function ManageEmployees() {
     active: true,
     contract_type: '08:00–17:00 / 10:00–19:00',
     notes: '',
+    preferred_shift_times: [],
+    blocked_shift_times: [],
   });
 
   const { toast } = useToast();
@@ -129,6 +131,8 @@ export default function ManageEmployees() {
       active: true,
       contract_type: '08:00–17:00 / 10:00–19:00',
       notes: '',
+      preferred_shift_times: [],
+      blocked_shift_times: [],
     });
     setEditingEmployee(null);
   };
@@ -149,6 +153,8 @@ export default function ManageEmployees() {
       active: employee.active,
       contract_type: employee.contract_type,
       notes: employee.notes || '',
+      preferred_shift_times: employee.preferred_shift_times || [],
+      blocked_shift_times: employee.blocked_shift_times || [],
     });
     setDialogOpen(true);
   };
@@ -245,6 +251,8 @@ export default function ManageEmployees() {
                               contract_type: '08:00–17:00 / 10:00–19:00',
                               start_date: format(new Date(), 'yyyy-MM-dd'),
                               notes: '',
+                              preferred_shift_times: [],
+                              blocked_shift_times: [],
                             });
                             setDialogOpen(true);
                           }}
@@ -406,6 +414,76 @@ export default function ManageEmployees() {
                 />
               </div>
 
+              <div>
+                <Label className="font-bold">שעות מועדפות לעובד</Label>
+                <p className="text-xs text-gray-500 mb-2">
+                  העובד יקבל קדימות במשמרות אלו
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {['מסיים ב-17:30', 'מסיים ב-19:00', 'שישי קצר', 'שישי ארוך'].map(shiftType => (
+                    <div key={`pref-${shiftType}`} className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id={`pref-${shiftType}`}
+                        checked={formData.preferred_shift_times.includes(shiftType)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFormData({
+                              ...formData,
+                              preferred_shift_times: [...formData.preferred_shift_times, shiftType]
+                            });
+                          } else {
+                            setFormData({
+                              ...formData,
+                              preferred_shift_times: formData.preferred_shift_times.filter(t => t !== shiftType)
+                            });
+                          }
+                        }}
+                        className="w-4 h-4"
+                      />
+                      <Label htmlFor={`pref-${shiftType}`} className="cursor-pointer text-sm">
+                        {shiftType}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <Label className="font-bold text-red-600">שעות חסומות לעובד</Label>
+                <p className="text-xs text-gray-500 mb-2">
+                  העובד לא ישובץ למשמרות אלו בשום מקרה
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {['מסיים ב-17:30', 'מסיים ב-19:00', 'שישי קצר', 'שישי ארוך'].map(shiftType => (
+                    <div key={`block-${shiftType}`} className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id={`block-${shiftType}`}
+                        checked={formData.blocked_shift_times.includes(shiftType)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFormData({
+                              ...formData,
+                              blocked_shift_times: [...formData.blocked_shift_times, shiftType]
+                            });
+                          } else {
+                            setFormData({
+                              ...formData,
+                              blocked_shift_times: formData.blocked_shift_times.filter(t => t !== shiftType)
+                            });
+                          }
+                        }}
+                        className="w-4 h-4"
+                      />
+                      <Label htmlFor={`block-${shiftType}`} className="cursor-pointer text-sm">
+                        {shiftType}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div className="flex gap-3 justify-end">
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                   ביטול
@@ -471,6 +549,8 @@ export default function ManageEmployees() {
                         active: true,
                         contract_type: '08:00–17:00 / 10:00–19:00',
                         notes: '',
+                        preferred_shift_times: [],
+                        blocked_shift_times: [],
                       });
                       setQuickLinkDialogOpen(false);
                       setDialogOpen(true);

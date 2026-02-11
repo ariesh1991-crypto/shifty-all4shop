@@ -73,18 +73,10 @@ export default function ManagerDashboard() {
   const [swapDialogOpen, setSwapDialogOpen] = useState(false);
   const [vacationDialogOpen, setVacationDialogOpen] = useState(false);
   const [recurringDialogOpen, setRecurringDialogOpen] = useState(false);
-  const [filterDialogOpen, setFilterDialogOpen] = useState(false);
-  const [advancedSettingsDialogOpen, setAdvancedSettingsDialogOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  const [filterEmployee, setFilterEmployee] = useState('all');
-  const [filterShiftType, setFilterShiftType] = useState('all');
   const [scheduleAlerts, setScheduleAlerts] = useState([]);
   const [calendarView, setCalendarView] = useState('month');
-  const [advancedSettings, setAdvancedSettings] = useState({
-    priorityEmployees: [],
-    avoidShiftTypes: [],
-  });
   const [aiSuggestions, setAiSuggestions] = useState(null);
   const [aiSuggestionsDialogOpen, setAiSuggestionsDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -140,11 +132,7 @@ export default function ManagerDashboard() {
     },
   });
 
-  const shifts = allShifts.filter(shift => {
-    const employeeMatch = filterEmployee === 'all' || shift.assigned_employee_id === filterEmployee;
-    const shiftTypeMatch = filterShiftType === 'all' || shift.shift_type === filterShiftType;
-    return employeeMatch && shiftTypeMatch;
-  });
+  const shifts = allShifts;
 
   const createShiftMutation = useMutation({
     mutationFn: (data) => {
@@ -590,12 +578,7 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
             const bPreferred = b.emp.preferred_shift_times && b.emp.preferred_shift_times.includes(shiftType);
             if (aPreferred !== bPreferred) return bPreferred ? 1 : -1;
             
-            // 2. תן עדיפות לעובדים בעדיפות גבוהה (הגדרות מתקדמות)
-            const aPriority = advancedSettings.priorityEmployees.includes(a.emp.id) ? -1 : 0;
-            const bPriority = advancedSettings.priorityEmployees.includes(b.emp.id) ? -1 : 0;
-            if (aPriority !== bPriority) return aPriority - bPriority;
-            
-            // 3. מיון לפי מספר משמרות (איזון עומס)
+            // 2. מיון לפי מספר משמרות (איזון עומס)
             return a.stats.totalShifts - b.stats.totalShifts;
           });
 
@@ -634,11 +617,6 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
           : ['מסיים ב-17:30', 'מסיים ב-19:00'];
 
         for (const shiftType of shiftTypes) {
-          // דלג על משמרות שסומנו להימנע
-          if (advancedSettings.avoidShiftTypes.includes(shiftType)) {
-            continue;
-          }
-          
           // בחר עובד למשמרת
           const preferredType = shiftType === 'מסיים ב-17:30' ? 'מעדיף מסיים ב-17:30' : 
                                 shiftType === 'מסיים ב-19:00' ? 'מעדיף מסיים ב-19:00' : null;
@@ -1013,10 +991,6 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
               <Plus className="w-4 h-4 ml-2" />
               משמרות חוזרות
             </Button>
-            <Button onClick={() => setFilterDialogOpen(true)} variant="outline">
-              <Filter className="w-4 h-4 ml-2" />
-              סינון
-            </Button>
             <Link to={createPageUrl('AllConstraints')}>
               <Button variant="outline">
                 <AlertCircle className="w-4 h-4 ml-2" />
@@ -1064,13 +1038,6 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
                 דחה הכל
               </Button>
             )}
-            <Button 
-              onClick={() => setAdvancedSettingsDialogOpen(true)} 
-              disabled={generating}
-              variant="outline"
-            >
-              ⚙️ הגדרות מתקדמות
-            </Button>
             <Button 
               onClick={generateSchedule} 
               disabled={generating}
@@ -1120,25 +1087,6 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
             </Button>
           </div>
         </div>
-
-        {(filterEmployee !== 'all' || filterShiftType !== 'all') && (
-          <div className="bg-white rounded-lg shadow-md p-4 mb-4">
-            <div className="flex items-center justify-between">
-              <div className="flex gap-2 items-center">
-                <span className="text-sm font-medium">סינון פעיל:</span>
-                {filterEmployee !== 'all' && (
-                  <Badge>{employees.find(e => e.id === filterEmployee)?.full_name}</Badge>
-                )}
-                {filterShiftType !== 'all' && (
-                  <Badge>{filterShiftType}</Badge>
-                )}
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => { setFilterEmployee('all'); setFilterShiftType('all'); }}>
-                נקה סינון
-              </Button>
-            </div>
-          </div>
-        )}
 
         {scheduleAlerts.length > 0 && (
           <div className="bg-white rounded-lg shadow-md mb-4">
@@ -1254,48 +1202,6 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
           </DialogContent>
         </Dialog>
 
-        <Dialog open={filterDialogOpen} onOpenChange={setFilterDialogOpen}>
-          <DialogContent dir="rtl">
-            <DialogHeader>
-              <DialogTitle>סינון משמרות</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label>עובד</Label>
-                <Select value={filterEmployee} onValueChange={setFilterEmployee}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">כל העובדים</SelectItem>
-                    {employees.map(emp => (
-                      <SelectItem key={emp.id} value={emp.id}>{emp.full_name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>סוג משמרת</Label>
-                <Select value={filterShiftType} onValueChange={setFilterShiftType}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">כל המשמרות</SelectItem>
-                    <SelectItem value="מסיים ב-17:30">מסיים ב-17:30</SelectItem>
-                    <SelectItem value="מסיים ב-19:00">מסיים ב-19:00</SelectItem>
-                    <SelectItem value="שישי קצר">שישי קצר</SelectItem>
-                    <SelectItem value="שישי ארוך">שישי ארוך</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button onClick={() => setFilterDialogOpen(false)} className="w-full">
-                החל סינון
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-
         <Dialog open={vacationDialogOpen} onOpenChange={setVacationDialogOpen}>
           <DialogContent dir="rtl" className="max-w-4xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
@@ -1321,23 +1227,6 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
               employees={employees}
               onApprove={handleApproveSwap}
               onReject={handleRejectSwap}
-            />
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={advancedSettingsDialogOpen} onOpenChange={setAdvancedSettingsDialogOpen}>
-          <DialogContent dir="rtl" className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>הגדרות מתקדמות ליצירת סידור</DialogTitle>
-            </DialogHeader>
-            <AdvancedSettingsForm
-              employees={employees.filter(e => e.active)}
-              settings={advancedSettings}
-              onSave={(settings) => {
-                setAdvancedSettings(settings);
-                setAdvancedSettingsDialogOpen(false);
-                toast({ title: 'הגדרות נשמרו' });
-              }}
             />
           </DialogContent>
         </Dialog>
@@ -1589,98 +1478,6 @@ function DayNoteEditor({ selectedDate, dayNote, onCreate, onUpdate, onDelete }) 
         </Button>
       </div>
     </div>
-  );
-}
-
-function AdvancedSettingsForm({ employees, settings, onSave }) {
-  const [priorityEmployees, setPriorityEmployees] = useState(settings.priorityEmployees || []);
-  const [avoidShiftTypes, setAvoidShiftTypes] = useState(settings.avoidShiftTypes || []);
-
-  const togglePriority = (empId) => {
-    setPriorityEmployees(prev =>
-      prev.includes(empId) ? prev.filter(id => id !== empId) : [...prev, empId]
-    );
-  };
-
-  const toggleAvoidShift = (shiftType) => {
-    setAvoidShiftTypes(prev =>
-      prev.includes(shiftType) ? prev.filter(t => t !== shiftType) : [...prev, shiftType]
-    );
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSave({ priorityEmployees, avoidShiftTypes });
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4">
-        <h3 className="font-bold text-blue-900 mb-2">💡 מה עושות ההגדרות המתקדמות?</h3>
-        <ul className="text-sm text-blue-800 space-y-1">
-          <li>• <strong>עדיפות לעובדים</strong>: עובדים שנבחרו יקבלו משמרות קודם</li>
-          <li>• <strong>משמרות להימנע</strong>: משמרות שנבחרו לא ייווצרו כלל בסידור</li>
-        </ul>
-      </div>
-
-      <div>
-        <Label className="text-lg font-bold mb-3 block">עובדים בעדיפות גבוהה</Label>
-        <p className="text-sm text-gray-600 mb-3">
-          עובדים אלו יקבלו משמרות לפני אחרים (טוב לעובדים חדשים או כאלו שצריכים יותר שעות)
-        </p>
-        <div className="space-y-2 max-h-48 overflow-y-auto bg-gray-50 p-3 rounded-lg">
-          {employees.map(emp => (
-            <div key={emp.id} className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                id={`priority-${emp.id}`}
-                checked={priorityEmployees.includes(emp.id)}
-                onChange={() => togglePriority(emp.id)}
-                className="w-4 h-4"
-              />
-              <Label htmlFor={`priority-${emp.id}`} className="cursor-pointer flex-1">
-                {emp.full_name}
-              </Label>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <Label className="text-lg font-bold mb-3 block">משמרות להימנע מהן</Label>
-        <p className="text-sm text-gray-600 mb-3">
-          משמרות אלו לא ייווצרו בסידור (שימושי אם אין צורך במשמרות מסוימות)
-        </p>
-        <div className="space-y-2 bg-gray-50 p-3 rounded-lg">
-          {['מסיים ב-17:30', 'מסיים ב-19:00', 'שישי קצר', 'שישי ארוך'].map(shiftType => (
-            <div key={shiftType} className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                id={`avoid-${shiftType}`}
-                checked={avoidShiftTypes.includes(shiftType)}
-                onChange={() => toggleAvoidShift(shiftType)}
-                className="w-4 h-4"
-              />
-              <Label htmlFor={`avoid-${shiftType}`} className="cursor-pointer flex-1">
-                {shiftType}
-              </Label>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex gap-3 justify-end pt-4 border-t">
-        <Button type="button" variant="outline" onClick={() => {
-          setPriorityEmployees([]);
-          setAvoidShiftTypes([]);
-        }}>
-          אפס הכל
-        </Button>
-        <Button type="submit">
-          שמור והחל
-        </Button>
-      </div>
-    </form>
   );
 }
 

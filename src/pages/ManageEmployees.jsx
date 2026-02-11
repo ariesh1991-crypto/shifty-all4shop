@@ -31,7 +31,6 @@ export default function ManageEmployees() {
     full_name: '',
     active: true,
     contract_type: '08:00–17:00 / 10:00–19:00',
-    start_date: '',
     notes: '',
   });
 
@@ -129,7 +128,6 @@ export default function ManageEmployees() {
       full_name: '',
       active: true,
       contract_type: '08:00–17:00 / 10:00–19:00',
-      start_date: '',
       notes: '',
     });
     setEditingEmployee(null);
@@ -150,7 +148,6 @@ export default function ManageEmployees() {
       full_name: employee.full_name,
       active: employee.active,
       contract_type: employee.contract_type,
-      start_date: employee.start_date || '',
       notes: employee.notes || '',
     });
     setDialogOpen(true);
@@ -303,7 +300,6 @@ export default function ManageEmployees() {
               <TableRow>
                 <TableHead className="text-right">שם עובד</TableHead>
                 <TableHead className="text-right">סטטוס</TableHead>
-                <TableHead className="text-right">תאריך תחילה</TableHead>
                 <TableHead className="text-right">משמרות החודש</TableHead>
                 <TableHead className="text-right">משתמש מחובר</TableHead>
                 <TableHead className="text-right">סוג חוזה</TableHead>
@@ -321,9 +317,6 @@ export default function ManageEmployees() {
                       <Badge variant={employee.active ? 'default' : 'secondary'}>
                         {employee.active ? 'פעיל' : 'לא פעיל'}
                       </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {employee.start_date ? format(new Date(employee.start_date), 'dd/MM/yyyy') : '-'}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -389,15 +382,6 @@ export default function ManageEmployees() {
                   onCheckedChange={(checked) => setFormData({ ...formData, active: checked })}
                 />
                 <Label>פעיל</Label>
-              </div>
-
-              <div>
-                <Label>תאריך תחילת העסקה (אופציונלי)</Label>
-                <Input
-                  type="date"
-                  value={formData.start_date}
-                  onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                />
               </div>
 
               <div>
@@ -486,7 +470,6 @@ export default function ManageEmployees() {
                         full_name: selectedUser.full_name || selectedUser.email,
                         active: true,
                         contract_type: '08:00–17:00 / 10:00–19:00',
-                        start_date: format(new Date(), 'yyyy-MM-dd'),
                         notes: '',
                       });
                       setQuickLinkDialogOpen(false);

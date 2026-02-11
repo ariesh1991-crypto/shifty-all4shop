@@ -223,6 +223,21 @@ export default function EmployeeConstraints() {
               <Calendar className="w-4 h-4 ml-2" />
               סימון ימים מרובים
             </Button>
+            <Button 
+              onClick={async () => {
+                if (confirm('האם אתה בטוח שברצונך למחוק את כל האילוצים שלך?')) {
+                  const allConstraints = await base44.entities.Constraint.list();
+                  const myConstraints = allConstraints.filter(c => c.employee_id === currentEmployee.id);
+                  for (const constraint of myConstraints) {
+                    await deleteConstraintMutation.mutateAsync(constraint.id);
+                  }
+                  toast({ title: `נמחקו ${myConstraints.length} אילוצים` });
+                }
+              }}
+              variant="destructive"
+            >
+              מחק את כל האילוצים שלי
+            </Button>
             <Button onClick={() => setCurrentDate(new Date(year, month - 2))} variant="outline">
               <ChevronRight className="w-5 h-5" />
             </Button>
@@ -536,7 +551,6 @@ function VacationRequestForm({ onSave }) {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="חופשה">חופשה</SelectItem>
-            <SelectItem value="מחלה">מחלה</SelectItem>
             <SelectItem value="אחר">אחר</SelectItem>
           </SelectContent>
         </Select>

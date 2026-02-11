@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, getMonth, getYear, getDay } from 'date-fns';
-import { ChevronLeft, ChevronRight, LogOut, Calendar, Briefcase } from 'lucide-react';
+import { ChevronLeft, ChevronRight, LogOut, Calendar, Briefcase, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import NotificationBell from '../components/notifications/NotificationBell';
@@ -266,6 +266,12 @@ export default function EmployeeConstraints() {
           <h1 className="text-3xl font-bold">{currentEmployee.full_name} - אילוצים והעדפות</h1>
           <div className="flex gap-2 flex-wrap">
             {currentUser && <NotificationBell userId={currentUser.id} />}
+            <Link to={createPageUrl('TeamVacations')}>
+              <Button variant="outline" className="bg-green-50 border-green-300 hover:bg-green-100">
+                <Users className="w-4 h-4 ml-2" />
+                חופשות הצוות
+              </Button>
+            </Link>
             <Link to={createPageUrl('EmployeeShifts')}>
               <Button variant="outline">המשמרות שלי</Button>
             </Link>

@@ -665,15 +665,34 @@ export default function ManagerDashboard() {
               );
             }
 
+            // בדוק קונפליקטים
+            const constraint = constraints.find(c => c.employee_id === shift.assigned_employee_id && c.date === dateStr);
+            const vacation = vacationRequests.find(v => 
+              v.employee_id === shift.assigned_employee_id && 
+              v.status === 'אושר' &&
+              dateStr >= v.start_date && 
+              dateStr <= v.end_date
+            );
+            
+            const hasConflict = (constraint?.unavailable) || vacation;
+
             return (
               <div
                 key={shift.id}
-                className={`text-xs p-1 rounded border-2 ${SHIFT_COLORS[shift.shift_type]} ${STATUS_COLORS[shift.status]}`}
+                className={`text-xs p-1 rounded border-2 ${SHIFT_COLORS[shift.shift_type]} ${STATUS_COLORS[shift.status]} ${hasConflict ? 'ring-2 ring-red-500 ring-offset-1' : ''}`}
               >
-                <div className="font-medium">{employee?.full_name || 'לא משובץ'}</div>
+                <div className="font-medium flex items-center gap-1">
+                  {hasConflict && <AlertCircle className="w-3 h-3 text-red-600" />}
+                  <span className={hasConflict ? 'text-red-700' : ''}>{employee?.full_name || 'לא משובץ'}</span>
+                </div>
                 <div className="text-[10px]">{shift.shift_type}</div>
                 {shift.start_time && shift.end_time && (
                   <div className="text-[9px] text-gray-600">{shift.start_time}–{shift.end_time}</div>
+                )}
+                {hasConflict && (
+                  <div className="text-[9px] text-red-600 font-bold mt-1">
+                    {vacation ? `חופש: ${vacation.type}` : constraint?.notes || 'לא זמין'}
+                  </div>
                 )}
               </div>
             );
@@ -703,6 +722,12 @@ export default function ManagerDashboard() {
               <Filter className="w-4 h-4 ml-2" />
               סינון
             </Button>
+            <Link to={createPageUrl('AllConstraints')}>
+              <Button variant="outline">
+                <AlertCircle className="w-4 h-4 ml-2" />
+                כל האילוצים
+              </Button>
+            </Link>
             <Link to={createPageUrl('ManageEmployees')}>
               <Button variant="outline">
                 <Users className="w-4 h-4 ml-2" />

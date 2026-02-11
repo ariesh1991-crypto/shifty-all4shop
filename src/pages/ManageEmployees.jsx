@@ -20,11 +20,13 @@ export default function ManageEmployees() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [quickLinkDialogOpen, setQuickLinkDialogOpen] = useState(false);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterActive, setFilterActive] = useState('all');
+  const [inviteEmail, setInviteEmail] = useState('');
   const [formData, setFormData] = useState({
     full_name: '',
     active: true,
@@ -106,6 +108,19 @@ export default function ManageEmployees() {
       toast({ title: 'משתמש חובר בהצלחה' });
       setLinkDialogOpen(false);
       setQuickLinkDialogOpen(false);
+    },
+  });
+
+  const inviteUserMutation = useMutation({
+    mutationFn: (email) => base44.users.inviteUser(email, 'user'),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['users']);
+      toast({ title: 'הזמנה נשלחה בהצלחה', description: 'העובד יקבל מייל עם קישור להרשמה' });
+      setInviteDialogOpen(false);
+      setInviteEmail('');
+    },
+    onError: (error) => {
+      toast({ title: 'שגיאה בשליחת הזמנה', description: error.message, variant: 'destructive' });
     },
   });
 
@@ -271,9 +286,14 @@ export default function ManageEmployees() {
                 </SelectContent>
               </Select>
             </div>
-            <Button onClick={() => setDialogOpen(true)} size="lg">
-              + הוסף עובד חדש
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={() => setInviteDialogOpen(true)} variant="outline" size="lg">
+                📧 הזמן עובד חדש
+              </Button>
+              <Button onClick={() => setDialogOpen(true)} size="lg">
+                + הוסף עובד חדש
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -522,6 +542,50 @@ export default function ManageEmployees() {
                   }}
                 >
                   ביטול
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+          <DialogContent dir="rtl">
+            <DialogHeader>
+              <DialogTitle>הזמן עובד חדש</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">
+                הזן כתובת אימייל ונשלח לעובד הזמנה להצטרף למערכת
+              </p>
+              <div>
+                <Label>כתובת אימייל</Label>
+                <Input
+                  type="email"
+                  placeholder="example@company.com"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="flex gap-3 justify-end">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setInviteDialogOpen(false);
+                    setInviteEmail('');
+                  }}
+                >
+                  ביטול
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (inviteEmail) {
+                      inviteUserMutation.mutate(inviteEmail);
+                    }
+                  }}
+                  disabled={!inviteEmail || inviteUserMutation.isPending}
+                >
+                  {inviteUserMutation.isPending ? 'שולח...' : 'שלח הזמנה'}
                 </Button>
               </div>
             </div>

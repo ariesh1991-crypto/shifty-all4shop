@@ -835,10 +835,12 @@ export default function ManagerDashboard() {
           
           <div className="flex gap-3 flex-wrap">
             {currentUser && <NotificationBell userId={currentUser.id} />}
-            <Button onClick={() => setVacationDialogOpen(true)} variant="outline">
-              <Briefcase className="w-4 h-4 ml-2" />
-              בקשות חופשה {pendingVacations.length > 0 && `(${pendingVacations.length})`}
-            </Button>
+            <Link to={createPageUrl('VacationManagement')}>
+              <Button variant="outline">
+                <Briefcase className="w-4 h-4 ml-2" />
+                בקשות חופשה {pendingVacations.length > 0 && `(${pendingVacations.length})`}
+              </Button>
+            </Link>
             <Button onClick={() => setRecurringDialogOpen(true)} variant="outline">
               <Plus className="w-4 h-4 ml-2" />
               משמרות חוזרות

@@ -981,6 +981,12 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
           
           <div className="flex gap-3 flex-wrap">
             {currentUser && <NotificationBell userId={currentUser.id} />}
+            <Link to={createPageUrl('TeamVacations')}>
+              <Button variant="outline" className="bg-green-50 border-green-300 hover:bg-green-100">
+                <Users className="w-4 h-4 ml-2" />
+                חופשות הצוות
+              </Button>
+            </Link>
             <Link to={createPageUrl('VacationManagement')}>
               <Button variant="outline">
                 <Briefcase className="w-4 h-4 ml-2" />

@@ -151,12 +151,20 @@ export default function EmployeeConstraints() {
     const dateStr = format(date, 'yyyy-MM-dd');
     const constraint = constraints.find(c => c.date === dateStr);
     const dayNumber = format(date, 'd');
+    
+    // בדוק אם יש חופש מאושר בתאריך זה
+    const approvedVacation = vacationRequests.find(v => 
+      v.status === 'אושר' && 
+      dateStr >= v.start_date && 
+      dateStr <= v.end_date
+    );
 
     return (
       <div
         key={date.toString()}
         onClick={() => { setSelectedDate(dateStr); setDialogOpen(true); }}
         className={`p-3 border-2 rounded-lg cursor-pointer hover:shadow-md min-h-[80px] ${
+          approvedVacation ? 'bg-green-100 border-green-500' :
           constraint?.unavailable ? 'bg-red-100 border-red-400' :
           constraint?.preference === 'מעדיף לסיים ב-17:30' ? 'bg-blue-100 border-blue-400' :
           constraint?.preference === 'מעדיף לסיים ב-19:00' ? 'bg-purple-100 border-purple-400' :
@@ -164,14 +172,19 @@ export default function EmployeeConstraints() {
         }`}
       >
         <div className="font-bold text-center mb-2">{dayNumber}</div>
-        {constraint && (
+        {approvedVacation ? (
+          <div className="text-xs text-center space-y-1">
+            <div className="font-bold text-green-700">✓ {approvedVacation.type}</div>
+            <div className="text-green-600 text-[10px]">מאושר</div>
+          </div>
+        ) : constraint ? (
           <div className="text-xs text-center space-y-1">
             {constraint.unavailable && <div className="font-bold text-red-600">לא זמין</div>}
             {constraint.preference && (
               <div className="text-gray-700">{constraint.preference}</div>
             )}
           </div>
-        )}
+        ) : null}
       </div>
     );
   };
@@ -273,7 +286,11 @@ export default function EmployeeConstraints() {
 
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
           <h3 className="font-bold mb-2">מקרא:</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded bg-green-100 border-2 border-green-500"></div>
+              <span className="text-sm">חופש מאושר</span>
+            </div>
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded bg-red-100 border-2 border-red-400"></div>
               <span className="text-sm">לא זמין</span>

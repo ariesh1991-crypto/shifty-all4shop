@@ -71,11 +71,16 @@ export default function ManagerDashboard() {
   const [vacationDialogOpen, setVacationDialogOpen] = useState(false);
   const [recurringDialogOpen, setRecurringDialogOpen] = useState(false);
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
+  const [advancedSettingsDialogOpen, setAdvancedSettingsDialogOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [filterEmployee, setFilterEmployee] = useState('all');
   const [filterShiftType, setFilterShiftType] = useState('all');
   const [scheduleAlerts, setScheduleAlerts] = useState([]);
+  const [advancedSettings, setAdvancedSettings] = useState({
+    priorityEmployees: [],
+    avoidShiftTypes: [],
+  });
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -439,10 +444,18 @@ export default function ManagerDashboard() {
       // פונקציה לבחור עובד למשמרת (בחירה הוגנת)
       const selectEmployeeForShift = (date, shiftType, preferredType = null) => {
         // מיון לפי מספר משמרות (מי שיש לו פחות יקבל קודם)
-        const sortedEmployees = activeEmployees
+        let sortedEmployees = activeEmployees
           .map(emp => ({ emp, stats: employeeStats[emp.id] }))
           .filter(({ emp }) => canAssignShift(emp.id, date, shiftType))
-          .sort((a, b) => a.stats.totalShifts - b.stats.totalShifts);
+          .sort((a, b) => {
+            // תן עדיפות לעובדים בעדיפות גבוהה
+            const aPriority = advancedSettings.priorityEmployees.includes(a.emp.id) ? -1 : 0;
+            const bPriority = advancedSettings.priorityEmployees.includes(b.emp.id) ? -1 : 0;
+            if (aPriority !== bPriority) return aPriority - bPriority;
+            
+            // אחרת מיון לפי מספר משמרות
+            return a.stats.totalShifts - b.stats.totalShifts;
+          });
 
         if (sortedEmployees.length === 0) return null;
 
@@ -479,6 +492,11 @@ export default function ManagerDashboard() {
           : ['מסיים ב-17:30', 'מסיים ב-19:00'];
 
         for (const shiftType of shiftTypes) {
+          // דלג על משמרות שסומנו להימנע
+          if (advancedSettings.avoidShiftTypes.includes(shiftType)) {
+            continue;
+          }
+          
           // בחר עובד למשמרת
           const preferredType = shiftType === 'מסיים ב-17:30' ? 'מעדיף מסיים ב-17:30' : 
                                 shiftType === 'מסיים ב-19:00' ? 'מעדיף מסיים ב-19:00' : null;
@@ -785,6 +803,13 @@ export default function ManagerDashboard() {
               </Button>
             )}
             <Button 
+              onClick={() => setAdvancedSettingsDialogOpen(true)} 
+              disabled={generating}
+              variant="outline"
+            >
+              ⚙️ הגדרות מתקדמות
+            </Button>
+            <Button 
               onClick={generateSchedule} 
               disabled={generating}
               variant="default"
@@ -990,8 +1015,117 @@ export default function ManagerDashboard() {
             />
           </DialogContent>
         </Dialog>
+
+        <Dialog open={advancedSettingsDialogOpen} onOpenChange={setAdvancedSettingsDialogOpen}>
+          <DialogContent dir="rtl" className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>הגדרות מתקדמות ליצירת סידור</DialogTitle>
+            </DialogHeader>
+            <AdvancedSettingsForm
+              employees={employees.filter(e => e.active)}
+              settings={advancedSettings}
+              onSave={(settings) => {
+                setAdvancedSettings(settings);
+                setAdvancedSettingsDialogOpen(false);
+                toast({ title: 'הגדרות נשמרו' });
+              }}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
+  );
+}
+
+function AdvancedSettingsForm({ employees, settings, onSave }) {
+  const [priorityEmployees, setPriorityEmployees] = useState(settings.priorityEmployees || []);
+  const [avoidShiftTypes, setAvoidShiftTypes] = useState(settings.avoidShiftTypes || []);
+
+  const togglePriority = (empId) => {
+    setPriorityEmployees(prev =>
+      prev.includes(empId) ? prev.filter(id => id !== empId) : [...prev, empId]
+    );
+  };
+
+  const toggleAvoidShift = (shiftType) => {
+    setAvoidShiftTypes(prev =>
+      prev.includes(shiftType) ? prev.filter(t => t !== shiftType) : [...prev, shiftType]
+    );
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSave({ priorityEmployees, avoidShiftTypes });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4">
+        <h3 className="font-bold text-blue-900 mb-2">💡 מה עושות ההגדרות המתקדמות?</h3>
+        <ul className="text-sm text-blue-800 space-y-1">
+          <li>• <strong>עדיפות לעובדים</strong>: עובדים שנבחרו יקבלו משמרות קודם</li>
+          <li>• <strong>משמרות להימנע</strong>: משמרות שנבחרו לא ייווצרו כלל בסידור</li>
+        </ul>
+      </div>
+
+      <div>
+        <Label className="text-lg font-bold mb-3 block">עובדים בעדיפות גבוהה</Label>
+        <p className="text-sm text-gray-600 mb-3">
+          עובדים אלו יקבלו משמרות לפני אחרים (טוב לעובדים חדשים או כאלו שצריכים יותר שעות)
+        </p>
+        <div className="space-y-2 max-h-48 overflow-y-auto bg-gray-50 p-3 rounded-lg">
+          {employees.map(emp => (
+            <div key={emp.id} className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id={`priority-${emp.id}`}
+                checked={priorityEmployees.includes(emp.id)}
+                onChange={() => togglePriority(emp.id)}
+                className="w-4 h-4"
+              />
+              <Label htmlFor={`priority-${emp.id}`} className="cursor-pointer flex-1">
+                {emp.full_name}
+              </Label>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <Label className="text-lg font-bold mb-3 block">משמרות להימנע מהן</Label>
+        <p className="text-sm text-gray-600 mb-3">
+          משמרות אלו לא ייווצרו בסידור (שימושי אם אין צורך במשמרות מסוימות)
+        </p>
+        <div className="space-y-2 bg-gray-50 p-3 rounded-lg">
+          {['מסיים ב-17:30', 'מסיים ב-19:00', 'שישי קצר', 'שישי ארוך'].map(shiftType => (
+            <div key={shiftType} className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id={`avoid-${shiftType}`}
+                checked={avoidShiftTypes.includes(shiftType)}
+                onChange={() => toggleAvoidShift(shiftType)}
+                className="w-4 h-4"
+              />
+              <Label htmlFor={`avoid-${shiftType}`} className="cursor-pointer flex-1">
+                {shiftType}
+              </Label>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex gap-3 justify-end pt-4 border-t">
+        <Button type="button" variant="outline" onClick={() => {
+          setPriorityEmployees([]);
+          setAvoidShiftTypes([]);
+        }}>
+          אפס הכל
+        </Button>
+        <Button type="submit">
+          שמור והחל
+        </Button>
+      </div>
+    </form>
   );
 }
 

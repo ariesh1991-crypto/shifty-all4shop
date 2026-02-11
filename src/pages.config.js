@@ -47,25 +47,25 @@
  *
  * The mainPage value must match a key in the PAGES object exactly.
  */
+import AllConstraints from './pages/AllConstraints';
 import EmployeeConstraints from './pages/EmployeeConstraints';
 import EmployeeShifts from './pages/EmployeeShifts';
 import EmployeeSwaps from './pages/EmployeeSwaps';
 import Home from './pages/Home';
 import ManageEmployees from './pages/ManageEmployees';
 import ManagerDashboard from './pages/ManagerDashboard';
-import AllConstraints from './pages/AllConstraints';
 import RecurringConstraints from './pages/RecurringConstraints';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
+    "AllConstraints": AllConstraints,
     "EmployeeConstraints": EmployeeConstraints,
     "EmployeeShifts": EmployeeShifts,
     "EmployeeSwaps": EmployeeSwaps,
     "Home": Home,
     "ManageEmployees": ManageEmployees,
     "ManagerDashboard": ManagerDashboard,
-    "AllConstraints": AllConstraints,
     "RecurringConstraints": RecurringConstraints,
 }
 

@@ -85,6 +85,8 @@ export default function ManagerDashboard() {
     priorityEmployees: [],
     avoidShiftTypes: [],
   });
+  const [aiSuggestions, setAiSuggestions] = useState(null);
+  const [aiSuggestionsDialogOpen, setAiSuggestionsDialogOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -365,8 +367,104 @@ export default function ManagerDashboard() {
     toast({ title: 'בקשת החופשה נדחתה' });
   };
 
+  const analyzeConflictsWithAI = async (unassignedShifts, alerts, employeeStats, allData) => {
+    try {
+      const prompt = `אתה מומחה לניהול משמרות עובדים. נתון לך מצב סידור משמרות עם קונפליקטים.
+
+**נתונים:**
+- משמרות שלא שובצו: ${unassignedShifts.length} משמרות
+${unassignedShifts.slice(0, 10).map(s => `  • ${s.date} - ${s.type}`).join('\n')}
+${unassignedShifts.length > 10 ? `  • ... ועוד ${unassignedShifts.length - 10}` : ''}
+
+- התראות קונפליקטים: ${alerts.length} התראות
+${alerts.slice(0, 5).map(a => `  • ${a.employeeName} - ${a.date}: ${a.message}`).join('\n')}
+${alerts.length > 5 ? `  • ... ועוד ${alerts.length - 5}` : ''}
+
+- סטטיסטיקות עובדים:
+${Object.values(employeeStats).slice(0, 5).map(s => 
+  `  • ${s.employee.full_name}: ${s.totalShifts} משמרות, ${s.fridayCount} שישי`
+).join('\n')}
+
+- אילוצים פעילים: ${allData.constraints.length}
+- חופשות מאושרות: ${allData.approvedVacations.length}
+
+**משימה:**
+1. נתח את הקונפליקטים לפי חומרה (קריטי/בינוני/נמוך)
+2. הצע פתרונות קונקרטיים:
+   - החלפות משמרות בין עובדים
+   - עובדים שיכולים לקבל עוד משמרות
+   - שינויים בהגדרות שיפתרו בעיות
+3. סמן קונפליקטים שלא ניתנים לפתרון
+4. הצע סדר עדיפויות לטיפול
+
+**חשוב:** התשובה חייבת להיות מעשית ומבוססת על הנתונים שסופקו.`;
+
+      const result = await base44.integrations.Core.InvokeLLM({
+        prompt,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            summary: {
+              type: "object",
+              properties: {
+                total_conflicts: { type: "number" },
+                critical_conflicts: { type: "number" },
+                resolvable_conflicts: { type: "number" },
+                unresolvable_conflicts: { type: "number" }
+              }
+            },
+            priority_conflicts: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  type: { type: "string" },
+                  severity: { type: "string" },
+                  description: { type: "string" },
+                  affected_dates: { type: "array", items: { type: "string" } },
+                  affected_employees: { type: "array", items: { type: "string" } }
+                }
+              }
+            },
+            suggested_solutions: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  solution_type: { type: "string" },
+                  title: { type: "string" },
+                  description: { type: "string" },
+                  expected_impact: { type: "string" },
+                  difficulty: { type: "string" }
+                }
+              }
+            },
+            unresolvable_issues: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  issue: { type: "string" },
+                  reason: { type: "string" },
+                  recommendation: { type: "string" }
+                }
+              }
+            },
+            overall_assessment: { type: "string" }
+          }
+        }
+      });
+
+      return result;
+    } catch (error) {
+      console.error('AI analysis failed:', error);
+      return null;
+    }
+  };
+
   const generateSchedule = async () => {
     setGenerating(true);
+    setAiSuggestions(null);
     try {
       // מחק משמרות קיימות
       const shiftsToDelete = allShifts.filter(s => s.date && s.date.startsWith(monthKey));
@@ -630,6 +728,26 @@ export default function ManagerDashboard() {
 
       // עדכן התראות
       setScheduleAlerts(alerts);
+
+      // הפעל AI לניתוח קונפליקטים אם יש בעיות משמעותיות
+      if (unassignedShifts.length > 0 || alerts.length > 3) {
+        toast({ 
+          title: 'מנתח קונפליקטים עם AI...', 
+          description: 'זה עשוי לקחת מספר שניות'
+        });
+
+        const approvedVacations = vacationRequests.filter(v => v.status === 'אושר');
+        const aiAnalysis = await analyzeConflictsWithAI(unassignedShifts, alerts, employeeStats, {
+          constraints,
+          approvedVacations,
+          employees: activeEmployees
+        });
+
+        if (aiAnalysis) {
+          setAiSuggestions(aiAnalysis);
+          setAiSuggestionsDialogOpen(true);
+        }
+      }
 
       // שלח מיילים לעובדים עם חריגות
       const uniqueEmployees = [...new Set(alerts.map(a => a.employeeId))];
@@ -1223,6 +1341,178 @@ export default function ManagerDashboard() {
             />
           </DialogContent>
         </Dialog>
+
+        <Dialog open={aiSuggestionsDialogOpen} onOpenChange={setAiSuggestionsDialogOpen}>
+          <DialogContent dir="rtl" className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-purple-600" />
+                ניתוח AI - פתרונות לקונפליקטים
+              </DialogTitle>
+            </DialogHeader>
+            {aiSuggestions && <AISuggestionsView suggestions={aiSuggestions} />}
+          </DialogContent>
+        </Dialog>
+      </div>
+    </div>
+  );
+}
+
+function AISuggestionsView({ suggestions }) {
+  const severityColors = {
+    'קריטי': 'bg-red-100 border-red-500 text-red-900',
+    'בינוני': 'bg-orange-100 border-orange-500 text-orange-900',
+    'נמוך': 'bg-yellow-100 border-yellow-500 text-yellow-900',
+  };
+
+  const difficultyIcons = {
+    'קל': '✅',
+    'בינוני': '⚠️',
+    'קשה': '🔴',
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* סיכום */}
+      <div className="bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-300 rounded-lg p-4">
+        <h3 className="font-bold text-lg mb-3 flex items-center gap-2">
+          📊 סיכום מצב
+        </h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="bg-white rounded p-3 text-center">
+            <div className="text-2xl font-bold text-gray-800">
+              {suggestions.summary?.total_conflicts || 0}
+            </div>
+            <div className="text-xs text-gray-600">סה״כ קונפליקטים</div>
+          </div>
+          <div className="bg-red-100 rounded p-3 text-center">
+            <div className="text-2xl font-bold text-red-700">
+              {suggestions.summary?.critical_conflicts || 0}
+            </div>
+            <div className="text-xs text-red-700">קריטיים</div>
+          </div>
+          <div className="bg-green-100 rounded p-3 text-center">
+            <div className="text-2xl font-bold text-green-700">
+              {suggestions.summary?.resolvable_conflicts || 0}
+            </div>
+            <div className="text-xs text-green-700">ניתנים לפתרון</div>
+          </div>
+          <div className="bg-gray-100 rounded p-3 text-center">
+            <div className="text-2xl font-bold text-gray-700">
+              {suggestions.summary?.unresolvable_conflicts || 0}
+            </div>
+            <div className="text-xs text-gray-700">לא ניתנים לפתרון</div>
+          </div>
+        </div>
+        {suggestions.overall_assessment && (
+          <div className="mt-4 p-3 bg-white rounded border border-purple-200">
+            <p className="text-sm text-gray-700">{suggestions.overall_assessment}</p>
+          </div>
+        )}
+      </div>
+
+      {/* קונפליקטים בעדיפות */}
+      {suggestions.priority_conflicts && suggestions.priority_conflicts.length > 0 && (
+        <div>
+          <h3 className="font-bold text-lg mb-3 flex items-center gap-2">
+            🎯 קונפליקטים בעדיפות גבוהה
+          </h3>
+          <div className="space-y-3">
+            {suggestions.priority_conflicts.map((conflict, idx) => (
+              <div 
+                key={idx} 
+                className={`border-2 rounded-lg p-4 ${
+                  severityColors[conflict.severity] || 'bg-gray-100'
+                }`}
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <div>
+                    <div className="font-bold">{conflict.type}</div>
+                    <Badge variant="outline" className="mt-1">{conflict.severity}</Badge>
+                  </div>
+                </div>
+                <p className="text-sm mb-2">{conflict.description}</p>
+                {conflict.affected_dates && conflict.affected_dates.length > 0 && (
+                  <div className="text-xs mt-2">
+                    <strong>תאריכים:</strong> {conflict.affected_dates.join(', ')}
+                  </div>
+                )}
+                {conflict.affected_employees && conflict.affected_employees.length > 0 && (
+                  <div className="text-xs mt-1">
+                    <strong>עובדים:</strong> {conflict.affected_employees.join(', ')}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* פתרונות מוצעים */}
+      {suggestions.suggested_solutions && suggestions.suggested_solutions.length > 0 && (
+        <div>
+          <h3 className="font-bold text-lg mb-3 flex items-center gap-2">
+            💡 פתרונות מוצעים
+          </h3>
+          <div className="space-y-3">
+            {suggestions.suggested_solutions.map((solution, idx) => (
+              <div key={idx} className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <div className="text-2xl">
+                    {difficultyIcons[solution.difficulty] || '📌'}
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-bold text-blue-900 mb-1">
+                      {solution.title}
+                    </div>
+                    <Badge variant="secondary" className="mb-2 text-xs">
+                      {solution.solution_type}
+                    </Badge>
+                    <p className="text-sm text-blue-800 mb-2">
+                      {solution.description}
+                    </p>
+                    <div className="flex gap-4 text-xs">
+                      <div>
+                        <strong>השפעה צפויה:</strong> {solution.expected_impact}
+                      </div>
+                      <div>
+                        <strong>רמת קושי:</strong> {solution.difficulty}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* בעיות שלא ניתן לפתור */}
+      {suggestions.unresolvable_issues && suggestions.unresolvable_issues.length > 0 && (
+        <div>
+          <h3 className="font-bold text-lg mb-3 flex items-center gap-2">
+            ⚠️ בעיות שדורשות התערבות ידנית
+          </h3>
+          <div className="space-y-3">
+            {suggestions.unresolvable_issues.map((issue, idx) => (
+              <div key={idx} className="bg-amber-50 border-2 border-amber-400 rounded-lg p-4">
+                <div className="font-bold text-amber-900 mb-2">{issue.issue}</div>
+                <div className="text-sm text-amber-800 mb-2">
+                  <strong>סיבה:</strong> {issue.reason}
+                </div>
+                <div className="text-sm text-amber-700 bg-white p-2 rounded">
+                  <strong>המלצה:</strong> {issue.recommendation}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="bg-gray-50 border rounded-lg p-4 text-center">
+        <p className="text-sm text-gray-600">
+          💡 השתמש בפתרונות המוצעים כדי לשפר את הסידור. ניתן ליישם אותם ידנית או לשנות הגדרות ולהריץ שוב.
+        </p>
       </div>
     </div>
   );

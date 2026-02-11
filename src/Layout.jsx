@@ -3,6 +3,26 @@ import React from 'react';
 export default function Layout({ children }) {
   return (
     <div className="min-h-screen bg-gray-50" dir="rtl">
+      <style>
+        {`
+          input[type="date"]::-webkit-datetime-edit-fields-wrapper {
+            display: flex;
+            flex-direction: row-reverse;
+          }
+          input[type="date"]::-webkit-datetime-edit-day-field {
+            order: 3;
+          }
+          input[type="date"]::-webkit-datetime-edit-month-field {
+            order: 2;
+          }
+          input[type="date"]::-webkit-datetime-edit-year-field {
+            order: 1;
+          }
+          input[type="date"]::-webkit-datetime-edit-text {
+            order: 2;
+          }
+        `}
+      </style>
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <img 

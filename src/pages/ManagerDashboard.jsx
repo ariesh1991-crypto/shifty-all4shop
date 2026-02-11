@@ -118,6 +118,11 @@ export default function ManagerDashboard() {
     queryFn: () => base44.entities.VacationRequest.list('-created_date'),
   });
 
+  const { data: dayNotes = [] } = useQuery({
+    queryKey: ['dayNotes'],
+    queryFn: () => base44.entities.DayNote.list(),
+  });
+
   const pendingVacations = vacationRequests.filter(v => v.status === 'ממתין לאישור');
 
   const approveScheduleMutation = useMutation({
@@ -207,6 +212,30 @@ export default function ManagerDashboard() {
     mutationFn: ({ id, data }) => base44.entities.VacationRequest.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries(['vacationRequests']);
+    },
+  });
+
+  const createDayNoteMutation = useMutation({
+    mutationFn: (data) => base44.entities.DayNote.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['dayNotes']);
+      toast({ title: 'הערת יום נשמרה' });
+    },
+  });
+
+  const updateDayNoteMutation = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.DayNote.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['dayNotes']);
+      toast({ title: 'הערת יום עודכנה' });
+    },
+  });
+
+  const deleteDayNoteMutation = useMutation({
+    mutationFn: (id) => base44.entities.DayNote.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['dayNotes']);
+      toast({ title: 'הערת יום נמחקה' });
     },
   });
 
@@ -689,6 +718,9 @@ export default function ManagerDashboard() {
       );
     });
 
+    // בדוק אם יש הערת יום
+    const dayNote = dayNotes.find(n => n.date === dateStr);
+
     // ספירת צפיפות - משמרות + חופשים
     const totalItems = dayShifts.length + employeesOnVacation.length;
     const isDense = totalItems > 3;
@@ -715,7 +747,7 @@ export default function ManagerDashboard() {
           isFriday ? 'bg-blue-50' : 'bg-white'
         }`}
       >
-        {(isDense || hasConflicts) && (
+        {(isDense || hasConflicts || dayNote) && (
           <div className="absolute top-1 left-1 flex gap-1">
             {hasConflicts && (
               <div className="w-2 h-2 rounded-full bg-red-500" title="קונפליקטים"></div>
@@ -723,10 +755,28 @@ export default function ManagerDashboard() {
             {isDense && (
               <div className="w-2 h-2 rounded-full bg-amber-500" title="צפיפות גבוהה"></div>
             )}
+            {dayNote && (
+              <div className={`w-2 h-2 rounded-full ${
+                dayNote.priority === 'דחוף' ? 'bg-red-600' :
+                dayNote.priority === 'חשוב' ? 'bg-orange-500' :
+                'bg-blue-500'
+              }`} title="יש הערת יום"></div>
+            )}
           </div>
         )}
         
         <div className="font-bold text-center mb-2">{dayNumber}</div>
+        
+        {/* הצג הערת יום אם יש */}
+        {dayNote && (
+          <div className={`text-[10px] p-1 rounded mb-2 border ${
+            dayNote.priority === 'דחוף' ? 'bg-red-100 border-red-400 text-red-800' :
+            dayNote.priority === 'חשוב' ? 'bg-orange-100 border-orange-400 text-orange-800' :
+            'bg-blue-100 border-blue-400 text-blue-800'
+          }`}>
+            <div className="font-bold">📌 {dayNote.note}</div>
+          </div>
+        )}
         
         {/* הצג עובדים בחופש בראש היום - מקוצר אם יש צפיפות */}
         {employeesOnVacation.length > 0 && (
@@ -1048,19 +1098,29 @@ export default function ManagerDashboard() {
         )}
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent dir="rtl" className="max-w-2xl">
+          <DialogContent dir="rtl" className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>עריכת משמרות - {selectedDate}</DialogTitle>
+              <DialogTitle>עריכת יום - {selectedDate}</DialogTitle>
             </DialogHeader>
-            <ShiftEditor
+            <DayNoteEditor
               selectedDate={selectedDate}
-              shifts={allShifts.filter(s => s.date === selectedDate)}
-              employees={employees}
-              onDelete={(id) => deleteShiftMutation.mutate(id)}
-              onUpdate={(id, data) => updateShiftMutation.mutate({ id, data })}
-              onCreate={(data) => createShiftMutation.mutate(data)}
-              onClose={() => setDialogOpen(false)}
+              dayNote={dayNotes.find(n => n.date === selectedDate)}
+              onCreate={(data) => createDayNoteMutation.mutate(data)}
+              onUpdate={(id, data) => updateDayNoteMutation.mutate({ id, data })}
+              onDelete={(id) => deleteDayNoteMutation.mutate(id)}
             />
+            <div className="border-t pt-4 mt-4">
+              <h3 className="font-bold mb-3">משמרות</h3>
+              <ShiftEditor
+                selectedDate={selectedDate}
+                shifts={allShifts.filter(s => s.date === selectedDate)}
+                employees={employees}
+                onDelete={(id) => deleteShiftMutation.mutate(id)}
+                onUpdate={(id, data) => updateShiftMutation.mutate({ id, data })}
+                onCreate={(data) => createShiftMutation.mutate(data)}
+                onClose={() => setDialogOpen(false)}
+              />
+            </div>
           </DialogContent>
         </Dialog>
 
@@ -1163,6 +1223,80 @@ export default function ManagerDashboard() {
             />
           </DialogContent>
         </Dialog>
+      </div>
+    </div>
+  );
+}
+
+function DayNoteEditor({ selectedDate, dayNote, onCreate, onUpdate, onDelete }) {
+  const [note, setNote] = useState(dayNote?.note || '');
+  const [priority, setPriority] = useState(dayNote?.priority || 'רגיל');
+
+  const handleSave = () => {
+    if (!note.trim()) return;
+    
+    if (dayNote) {
+      onUpdate(dayNote.id, { note, priority });
+    } else {
+      onCreate({ date: selectedDate, note, priority });
+    }
+    
+    setNote('');
+    setPriority('רגיל');
+  };
+
+  const handleDelete = () => {
+    if (dayNote && confirm('האם למחוק את הערת היום?')) {
+      onDelete(dayNote.id);
+      setNote('');
+      setPriority('רגיל');
+    }
+  };
+
+  return (
+    <div className="space-y-4 bg-blue-50 border-2 border-blue-300 rounded-lg p-4">
+      <div className="flex items-center gap-2 text-blue-900">
+        <span className="text-2xl">📌</span>
+        <h3 className="font-bold text-lg">הערת יום למנהל</h3>
+      </div>
+      <p className="text-sm text-blue-700">
+        הערה זו תוצג לכל העובדים ותעזור להם לדעת מתי לא לקחת חופש/אילוץ
+      </p>
+      
+      <div>
+        <Label>תוכן ההערה</Label>
+        <Textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder='לדוגמא: "שדרוג לקוח XYZ - נדרשים כל העובדים"'
+          rows={3}
+          className="bg-white"
+        />
+      </div>
+
+      <div>
+        <Label>רמת חשיבות</Label>
+        <Select value={priority} onValueChange={setPriority}>
+          <SelectTrigger className="bg-white">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="רגיל">רגיל</SelectItem>
+            <SelectItem value="חשוב">חשוב 🟠</SelectItem>
+            <SelectItem value="דחוף">דחוף 🔴</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex gap-2 justify-end">
+        {dayNote && (
+          <Button variant="destructive" onClick={handleDelete}>
+            מחק הערה
+          </Button>
+        )}
+        <Button onClick={handleSave} disabled={!note.trim()}>
+          {dayNote ? 'עדכן הערה' : 'שמור הערה'}
+        </Button>
       </div>
     </div>
   );

@@ -75,6 +75,11 @@ export default function EmployeeConstraints() {
     enabled: !!currentEmployee,
   });
 
+  const { data: dayNotes = [] } = useQuery({
+    queryKey: ['dayNotes'],
+    queryFn: () => base44.entities.DayNote.list(),
+  });
+
   const createConstraintMutation = useMutation({
     mutationFn: (data) => base44.entities.Constraint.create(data),
     onSuccess: () => {
@@ -156,7 +161,8 @@ export default function EmployeeConstraints() {
       dateStr >= v.start_date && 
       dateStr <= v.end_date
     );
-    return { constraint, approvedVacation };
+    const dayNote = dayNotes.find(n => n.date === dateStr);
+    return { constraint, approvedVacation, dayNote };
   };
 
   const renderDay = (date) => {
@@ -164,11 +170,11 @@ export default function EmployeeConstraints() {
     if (dayOfWeek === 6) return null;
 
     const dateStr = format(date, 'yyyy-MM-dd');
-    const { constraint, approvedVacation } = getConstraintsForDate(dateStr);
+    const { constraint, approvedVacation, dayNote } = getConstraintsForDate(dateStr);
     const dayNumber = format(date, 'd');
     
     // Count items for density indicator
-    const itemCount = (constraint ? 1 : 0) + (approvedVacation ? 1 : 0);
+    const itemCount = (constraint ? 1 : 0) + (approvedVacation ? 1 : 0) + (dayNote ? 1 : 0);
     const hasMultipleItems = itemCount > 1;
 
     return (
@@ -176,6 +182,7 @@ export default function EmployeeConstraints() {
         key={date.toString()}
         onClick={() => { setSelectedDate(dateStr); setDialogOpen(true); }}
         className={`p-3 border-2 rounded-lg cursor-pointer hover:shadow-md min-h-[80px] relative ${
+          dayNote ? 'bg-yellow-50 border-yellow-400' :
           approvedVacation ? 'bg-green-100 border-green-500' :
           constraint?.unavailable ? 'bg-red-100 border-red-400' :
           constraint?.preference === 'מעדיף לסיים ב-17:30' ? 'bg-blue-100 border-blue-400' :
@@ -183,13 +190,30 @@ export default function EmployeeConstraints() {
           'bg-white'
         }`}
       >
-        {hasMultipleItems && (
+        {(hasMultipleItems || dayNote) && (
           <div className="absolute top-1 left-1">
-            <AlertTriangle className="w-3 h-3 text-amber-600" />
+            {dayNote ? (
+              <div className={`w-3 h-3 rounded-full ${
+                dayNote.priority === 'דחוף' ? 'bg-red-600' :
+                dayNote.priority === 'חשוב' ? 'bg-orange-500' :
+                'bg-blue-500'
+              }`} title="יש הערת מנהל"></div>
+            ) : hasMultipleItems ? (
+              <AlertTriangle className="w-3 h-3 text-amber-600" />
+            ) : null}
           </div>
         )}
         <div className="font-bold text-center mb-2">{dayNumber}</div>
         <div className="space-y-1">
+          {dayNote && (
+            <div className={`text-[10px] p-1 rounded mb-1 border ${
+              dayNote.priority === 'דחוף' ? 'bg-red-100 border-red-400 text-red-800' :
+              dayNote.priority === 'חשוב' ? 'bg-orange-100 border-orange-400 text-orange-800' :
+              'bg-blue-100 border-blue-400 text-blue-800'
+            }`}>
+              <div className="font-bold">📌 {dayNote.note}</div>
+            </div>
+          )}
           {approvedVacation && (
             <div className="text-xs text-center">
               <div className="font-bold text-green-700">✓ {approvedVacation.type}</div>
@@ -346,19 +370,37 @@ export default function EmployeeConstraints() {
             currentDate={currentDate}
             items={constraints.concat(vacationRequests.filter(v => v.status === 'אושר'))}
             getItemsForDate={(dateStr) => {
-              const { constraint, approvedVacation } = getConstraintsForDate(dateStr);
+              const { constraint, approvedVacation, dayNote } = getConstraintsForDate(dateStr);
               const items = [];
+              if (dayNote) items.push({ type: 'dayNote', data: dayNote });
               if (approvedVacation) items.push({ type: 'vacation', data: approvedVacation });
               if (constraint) items.push({ type: 'constraint', data: constraint });
               return items;
             }}
             renderItem={(item, idx) => (
-              <div key={idx} className={`p-2 rounded-lg text-sm ${
-                item.type === 'vacation' ? 'bg-green-100 border border-green-500' :
-                item.data.unavailable ? 'bg-red-100 border border-red-400' :
-                'bg-blue-100 border border-blue-400'
+              <div key={idx} className={`p-2 rounded-lg text-sm border ${
+                item.type === 'dayNote' ? (
+                  item.data.priority === 'דחוף' ? 'bg-red-100 border-red-400' :
+                  item.data.priority === 'חשוב' ? 'bg-orange-100 border-orange-400' :
+                  'bg-blue-100 border-blue-400'
+                ) :
+                item.type === 'vacation' ? 'bg-green-100 border-green-500' :
+                item.data.unavailable ? 'bg-red-100 border-red-400' :
+                'bg-blue-100 border-blue-400'
               }`}>
-                {item.type === 'vacation' ? (
+                {item.type === 'dayNote' ? (
+                  <div>
+                    <div className="font-bold flex items-center gap-1">
+                      📌 הערת מנהל
+                      {item.data.priority !== 'רגיל' && (
+                        <Badge variant="secondary" className="text-xs">
+                          {item.data.priority}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="text-xs mt-1">{item.data.note}</div>
+                  </div>
+                ) : item.type === 'vacation' ? (
                   <div>
                     <div className="font-bold text-green-700">✓ {item.data.type}</div>
                     <div className="text-green-600 text-xs">מאושר</div>

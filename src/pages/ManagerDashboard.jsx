@@ -394,6 +394,7 @@ export default function ManagerDashboard() {
       // פונקציה לבדוק אם עובד יכול לקבל משמרת
       const canAssignShift = (empId, date, shiftType) => {
         const stats = employeeStats[empId];
+        const employee = stats.employee;
         const weekNum = getWeekNum(date);
         const dateStr = format(date, 'yyyy-MM-dd');
         const isFridayShift = shiftType.includes('שישי');
@@ -403,6 +404,11 @@ export default function ManagerDashboard() {
 
         // בדוק זמינות
         if (!isEmployeeAvailable(empId, dateStr)) return false;
+
+        // בדוק אם המשמרת חסומה לעובד זה
+        if (employee.blocked_shift_times && employee.blocked_shift_times.includes(shiftType)) {
+          return false;
+        }
 
         // בדוק מגבלת שבוע (מקסימום 2 משמרות)
         const weekShifts = stats.weeklyShifts[weekNum] || 0;
@@ -441,25 +447,30 @@ export default function ManagerDashboard() {
         if (isFridayShift) stats.fridayCount += 1;
       };
 
-      // פונקציה לבחור עובד למשמרת (בחירה הוגנת)
+      // פונקציה לבחור עובד למשמרת (בחירה הוגנת + אופטימיזציה)
       const selectEmployeeForShift = (date, shiftType, preferredType = null) => {
         // מיון לפי מספר משמרות (מי שיש לו פחות יקבל קודם)
         let sortedEmployees = activeEmployees
           .map(emp => ({ emp, stats: employeeStats[emp.id] }))
           .filter(({ emp }) => canAssignShift(emp.id, date, shiftType))
           .sort((a, b) => {
-            // תן עדיפות לעובדים בעדיפות גבוהה
+            // 1. תן עדיפות לעובדים שזו המשמרת המועדפת שלהם
+            const aPreferred = a.emp.preferred_shift_times && a.emp.preferred_shift_times.includes(shiftType);
+            const bPreferred = b.emp.preferred_shift_times && b.emp.preferred_shift_times.includes(shiftType);
+            if (aPreferred !== bPreferred) return bPreferred ? 1 : -1;
+            
+            // 2. תן עדיפות לעובדים בעדיפות גבוהה (הגדרות מתקדמות)
             const aPriority = advancedSettings.priorityEmployees.includes(a.emp.id) ? -1 : 0;
             const bPriority = advancedSettings.priorityEmployees.includes(b.emp.id) ? -1 : 0;
             if (aPriority !== bPriority) return aPriority - bPriority;
             
-            // אחרת מיון לפי מספר משמרות
+            // 3. מיון לפי מספר משמרות (איזון עומס)
             return a.stats.totalShifts - b.stats.totalShifts;
           });
 
         if (sortedEmployees.length === 0) return null;
 
-        // נסה למצוא עובד עם העדפה מתאימה
+        // נסה למצוא עובד עם העדפה מתאימה מה-constraints
         if (preferredType) {
           const preferred = sortedEmployees.find(({ emp }) => {
             const constraint = constraints.find(c => 
@@ -471,7 +482,7 @@ export default function ManagerDashboard() {
           if (preferred) return preferred.emp.id;
         }
 
-        // אחרת - תן למי שיש פחות משמרות
+        // אחרת - תן למי שיש פחות משמרות (ראש הרשימה)
         return sortedEmployees[0].emp.id;
       };
 

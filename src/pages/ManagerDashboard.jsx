@@ -488,6 +488,8 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
           weeklyShiftTypes: {}, // { weekNum: [shift_types] }
           assignedDates: new Set(), // תאריכים שבהם העובד כבר משובץ
           fridayCount: 0,
+          fridayLongCount: 0, // ספירת שישי ארוך
+          fridayShortCount: 0, // ספירת שישי קצר
           totalShifts: 0,
         };
       });
@@ -537,8 +539,8 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
         const weekShifts = stats.weeklyShifts[weekNum] || 0;
         if (weekShifts >= 2) return false;
 
-        // בדוק מגבלת שישי (מקסימום 1 לחודש)
-        if (isFridayShift && stats.fridayCount >= 1) return false;
+        // בדוק מגבלת שישי (מקסימום 2 לחודש, אבל רק אם אין ברירה)
+        if (isFridayShift && stats.fridayCount >= 2) return false;
 
         // בדוק חוק חדש: משמרת שנייה בשבוע חייבת להיות מסוג שונה
         if (!isFridayShift && weekShifts === 1) {
@@ -567,7 +569,11 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
         stats.weeklyShiftTypes[weekNum].push(shiftType);
         
         stats.totalShifts += 1;
-        if (isFridayShift) stats.fridayCount += 1;
+        if (isFridayShift) {
+          stats.fridayCount += 1;
+          if (shiftType === 'שישי ארוך') stats.fridayLongCount += 1;
+          if (shiftType === 'שישי קצר') stats.fridayShortCount += 1;
+        }
       };
 
       // פונקציה לבחור עובד למשמרת (בחירה הוגנת + אופטימיזציה)
@@ -617,7 +623,7 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
         const isFriday = dayOfWeek === 5;
 
         const shiftTypes = isFriday
-          ? ['שישי קצר', 'שישי ארוך']
+          ? ['שישי ארוך', 'שישי קצר'] // ארוך קודם - צריך מישהו קבוע בארוכה
           : ['מסיים ב-17:30', 'מסיים ב-19:00'];
 
         for (const shiftType of shiftTypes) {
@@ -625,7 +631,51 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
           const preferredType = shiftType === 'מסיים ב-17:30' ? 'מעדיף מסיים ב-17:30' : 
                                 shiftType === 'מסיים ב-19:00' ? 'מעדיף מסיים ב-19:00' : null;
           
-          const empId = selectEmployeeForShift(day, shiftType, preferredType);
+          // לוגיקה מיוחדת לשישי
+          let empId;
+          if (isFriday) {
+            // נסה למצוא עובד שטרם עשה שישי בחודש
+            empId = selectEmployeeForShift(day, shiftType, preferredType);
+            
+            // אם לא נמצא אף עובד, נסה למצוא מי שעשה רק שישי אחד
+            // ואם הוא עשה ארוך, עכשיו יעשה קצר
+            if (!empId && shiftType === 'שישי קצר') {
+              const candidatesWithOneFriday = activeEmployees
+                .filter(emp => {
+                  const stats = employeeStats[emp.id];
+                  return stats.fridayCount === 1 && 
+                         stats.fridayLongCount === 1 && 
+                         canAssignShift(emp.id, day, shiftType);
+                });
+              
+              if (candidatesWithOneFriday.length > 0) {
+                // בחר את מי שיש לו הכי פחות משמרות בסך הכל
+                candidatesWithOneFriday.sort((a, b) => 
+                  employeeStats[a.id].totalShifts - employeeStats[b.id].totalShifts
+                );
+                empId = candidatesWithOneFriday[0].id;
+              }
+            }
+            
+            if (!empId && shiftType === 'שישי ארוך') {
+              const candidatesWithOneFriday = activeEmployees
+                .filter(emp => {
+                  const stats = employeeStats[emp.id];
+                  return stats.fridayCount === 1 && 
+                         stats.fridayShortCount === 1 && 
+                         canAssignShift(emp.id, day, shiftType);
+                });
+              
+              if (candidatesWithOneFriday.length > 0) {
+                candidatesWithOneFriday.sort((a, b) => 
+                  employeeStats[a.id].totalShifts - employeeStats[b.id].totalShifts
+                );
+                empId = candidatesWithOneFriday[0].id;
+              }
+            }
+          } else {
+            empId = selectEmployeeForShift(day, shiftType, preferredType);
+          }
 
           if (empId) {
             const employee = activeEmployees.find(e => e.id === empId);

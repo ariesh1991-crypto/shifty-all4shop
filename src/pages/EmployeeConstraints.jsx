@@ -243,9 +243,9 @@ export default function EmployeeConstraints() {
             </h3>
             <div className="space-y-2">
               {pendingVacations.map(v => (
-                <div key={v.id} className="text-sm text-yellow-700">
-                  • {v.type}: {format(new Date(v.start_date), 'dd/MM/yyyy')} - {format(new Date(v.end_date), 'dd/MM/yyyy')}
-                </div>
+               <div key={v.id} className="text-sm text-yellow-700">
+                 • {v.type}: {format(new Date(v.start_date), 'dd/MM/yyyy')} - {format(new Date(v.end_date), 'dd/MM/yyyy')}
+               </div>
               ))}
             </div>
           </div>

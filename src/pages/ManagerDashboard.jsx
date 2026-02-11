@@ -67,7 +67,11 @@ function validateShiftForDay(shiftType, dayOfWeek) {
 }
 
 export default function ManagerDashboard() {
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(() => {
+    const nextMonth = new Date();
+    nextMonth.setMonth(nextMonth.getMonth() + 1);
+    return nextMonth;
+  });
   const [selectedDate, setSelectedDate] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [swapDialogOpen, setSwapDialogOpen] = useState(false);

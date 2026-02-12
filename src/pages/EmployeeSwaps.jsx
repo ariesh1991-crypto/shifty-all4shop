@@ -65,6 +65,17 @@ export default function EmployeeSwaps() {
 
   const createSwapMutation = useMutation({
     mutationFn: async (data) => {
+      // בדוק אם יש כבר בקשה פתוחה לאותה משמרת
+      const existingRequest = await base44.entities.SwapRequest.filter({
+        shift_id: data.shift_id,
+        requesting_employee_id: data.requesting_employee_id,
+        status: 'ממתין לאישור'
+      });
+      
+      if (existingRequest.length > 0) {
+        throw new Error('כבר קיימת בקשה פתוחה לאותה משמרת');
+      }
+      
       const swapRequest = await base44.entities.SwapRequest.create(data);
       
       // Notify target employee
@@ -99,6 +110,12 @@ export default function EmployeeSwaps() {
       queryClient.invalidateQueries(['swapRequests']);
       toast({ title: 'בקשת החלפה נשלחה' });
       setDialogOpen(false);
+    },
+    onError: (error) => {
+      toast({ 
+        title: error.message || 'שגיאה בשליחת בקשה',
+        variant: 'destructive'
+      });
     },
   });
 

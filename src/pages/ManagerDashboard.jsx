@@ -518,9 +518,9 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
         const constraint = constraints.find(c => c.employee_id === empId && c.date === dateStr);
         if (constraint?.unavailable) return false;
         
-        // בדוק אילוצים חוזרים (לימודים וכו')
+        // בדוק אילוצים חוזרים (רק מאושרים)
         const recurringConstraint = recurringConstraints.find(
-          rc => rc.employee_id === empId && rc.day_of_week === dayOfWeek && rc.unavailable
+          rc => rc.employee_id === empId && rc.day_of_week === dayOfWeek && rc.unavailable && rc.status === 'אושר'
         );
         if (recurringConstraint) return false;
         

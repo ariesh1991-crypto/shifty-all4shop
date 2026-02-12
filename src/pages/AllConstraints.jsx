@@ -51,6 +51,10 @@ export default function AllConstraints() {
 
   const filteredConstraints = allConstraints
     .filter(c => {
+      // סנן אילוצים עם employee_id לא קיים
+      const employeeExists = employees.some(e => e.id === c.employee_id);
+      if (!employeeExists) return false;
+      
       const employeeMatch = filterEmployee === 'all' || c.employee_id === filterEmployee;
       const typeMatch = filterType === 'all' || 
         (filterType === 'unavailable' && c.unavailable) ||
@@ -80,8 +84,11 @@ export default function AllConstraints() {
     const dateStr = format(date, 'yyyy-MM-dd');
     const dayNumber = format(date, 'd');
     
-    // מצא אילוצים ליום זה
-    const dayConstraints = allConstraints.filter(c => c.date === dateStr);
+    // מצא אילוצים ליום זה (רק עם employee_id קיים)
+    const dayConstraints = allConstraints.filter(c => {
+      if (c.date !== dateStr) return false;
+      return employees.some(e => e.id === c.employee_id);
+    });
     
     // בדוק אילוצים חוזרים
     const dayRecurringConstraints = recurringConstraints.filter(rc => rc.day_of_week === dayOfWeek);

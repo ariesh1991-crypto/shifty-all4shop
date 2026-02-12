@@ -106,7 +106,17 @@ export default function ManagerDashboard() {
     queryKey: ['shifts', year, month],
     queryFn: async () => {
       const allShifts = await base44.entities.Shift.list();
-      return allShifts.filter(s => s.date && s.date.startsWith(monthKey));
+      const filtered = allShifts.filter(s => s.date && s.date.startsWith(monthKey));
+      // סינון כפילויות - אם יש כמה משמרות לאותו employee באותו יום באותו סוג, קח רק את האחרונה
+      const uniqueMap = new Map();
+      filtered.forEach(s => {
+        const key = `${s.date}-${s.shift_type}`;
+        const existing = uniqueMap.get(key);
+        if (!existing || new Date(s.updated_date) > new Date(existing.updated_date)) {
+          uniqueMap.set(key, s);
+        }
+      });
+      return Array.from(uniqueMap.values());
     },
   });
 

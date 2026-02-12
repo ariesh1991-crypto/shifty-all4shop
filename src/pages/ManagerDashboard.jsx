@@ -523,39 +523,63 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
         const weekNum = getWeekNum(date);
         const dateStr = format(date, 'yyyy-MM-dd');
         const isFridayShift = shiftType.includes('שישי');
+        
+        // דיבאג לנופר
+        const isNufer = employee.full_name === 'נופר';
 
         // בדוק שהעובד לא כבר משובץ באותו יום
-        if (stats.assignedDates.has(dateStr)) return false;
+        if (stats.assignedDates.has(dateStr)) {
+          if (isNufer) console.log(`נופר כבר משובצת ב-${dateStr}`);
+          return false;
+        }
 
         // בדוק זמינות
-        if (!isEmployeeAvailable(empId, dateStr)) return false;
+        if (!isEmployeeAvailable(empId, dateStr)) {
+          if (isNufer) console.log(`נופר לא זמינה ב-${dateStr}`);
+          return false;
+        }
 
         // בדוק אם המשמרת חסומה לעובד זה
         if (employee.blocked_shift_times && employee.blocked_shift_times.includes(shiftType)) {
+          if (isNufer) console.log(`נופר חסומה ממשמרת ${shiftType}`);
           return false;
         }
 
         // בדוק מגבלת שבוע (מקסימום 2 משמרות)
         const weekShifts = stats.weeklyShifts[weekNum] || 0;
-        if (weekShifts >= 2) return false;
+        if (weekShifts >= 2) {
+          if (isNufer) console.log(`נופר כבר עם 2 משמרות בשבוע ${weekNum}`);
+          return false;
+        }
 
         // בדוק מגבלת שישי (מקסימום 2 לחודש)
-        if (isFridayShift && stats.fridayCount >= 2) return false;
+        if (isFridayShift && stats.fridayCount >= 2) {
+          if (isNufer) console.log(`נופר כבר עם 2 משמרות שישי החודש`);
+          return false;
+        }
 
         // חוק חשוב: אם עובד כבר עשה שישי אחד, השני חייב להיות מסוג שונה
         if (isFridayShift && stats.fridayCount === 1) {
-          if (shiftType === 'שישי ארוך' && stats.fridayLongCount > 0) return false;
-          if (shiftType === 'שישי קצר' && stats.fridayShortCount > 0) return false;
+          if (shiftType === 'שישי ארוך' && stats.fridayLongCount > 0) {
+            if (isNufer) console.log(`נופר כבר עשתה שישי ארוך`);
+            return false;
+          }
+          if (shiftType === 'שישי קצר' && stats.fridayShortCount > 0) {
+            if (isNufer) console.log(`נופר כבר עשתה שישי קצר`);
+            return false;
+          }
         }
 
         // בדוק חוק: משמרת שנייה בשבוע חייבת להיות מסוג שונה (לימים רגילים)
         if (!isFridayShift && weekShifts === 1) {
           const weekTypes = stats.weeklyShiftTypes[weekNum] || [];
           if (weekTypes.includes(shiftType)) {
+            if (isNufer) console.log(`נופר כבר עם משמרת ${shiftType} השבוע`);
             return false; // כבר יש לו משמרת מהסוג הזה השבוע
           }
         }
 
+        if (isNufer && isFridayShift) console.log(`✅ נופר יכולה לקבל ${shiftType} ב-${dateStr}`);
         return true;
       };
 

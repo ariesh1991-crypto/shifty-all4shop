@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
-import { LogOut, Clock, AlertCircle } from 'lucide-react';
+import { LogOut, Clock } from 'lucide-react';
 
 const UserNotRegisteredError = () => {
   const [currentUser, setCurrentUser] = useState(null);

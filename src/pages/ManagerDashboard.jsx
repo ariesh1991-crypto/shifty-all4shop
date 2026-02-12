@@ -807,10 +807,10 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
               });
             }
 
-            // בדוק אילוץ חוזר
+            // בדוק אילוץ חוזר (רק מאושרים)
             const dayOfWeek = getDay(new Date(dateStr));
             const recurringConstraint = recurringConstraints.find(
-              rc => rc.employee_id === empId && rc.day_of_week === dayOfWeek && rc.unavailable
+              rc => rc.employee_id === empId && rc.day_of_week === dayOfWeek && rc.unavailable && rc.status === 'אושר'
             );
             if (recurringConstraint) {
               alerts.push({
@@ -962,6 +962,11 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
 
     // בדוק אם יש הערת יום
     const dayNote = dayNotes.find(n => n.date === dateStr);
+    
+    // מצא אילוצים חוזרים מאושרים ליום זה
+    const dayRecurringConstraints = recurringConstraints.filter(rc => 
+      rc.day_of_week === dayOfWeek && rc.status === 'אושר'
+    );
 
     // ספירת צפיפות - משמרות + חופשים
     const totalItems = dayShifts.length + employeesOnVacation.length;
@@ -1015,6 +1020,21 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
             'bg-blue-100 border-blue-400 text-blue-800'
           }`}>
             <div className="font-bold">📌 {dayNote.note}</div>
+          </div>
+        )}
+        
+        {/* הצג אילוצים חוזרים מאושרים */}
+        {dayRecurringConstraints.length > 0 && (
+          <div className="space-y-1 mb-2">
+            {dayRecurringConstraints.map(rc => {
+              const emp = employees.find(e => e.id === rc.employee_id);
+              return (
+                <div key={rc.id} className="text-[10px] p-1 rounded bg-orange-200 border border-orange-400">
+                  <div className="font-bold text-orange-900">🔄 {emp?.full_name}</div>
+                  {rc.notes && <div className="text-orange-700 text-[9px]">{rc.notes}</div>}
+                </div>
+              );
+            })}
           </div>
         )}
         
@@ -1079,8 +1099,14 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
               if (v.employee_id !== shift.assigned_employee_id || v.status !== 'אושר') return false;
               return dateStr >= v.start_date && dateStr <= v.end_date;
             });
+            const recurringForShift = recurringConstraints.find(rc => 
+              rc.employee_id === shift.assigned_employee_id && 
+              rc.day_of_week === dayOfWeek && 
+              rc.unavailable && 
+              rc.status === 'אושר'
+            );
             
-            const hasConflict = (constraint?.unavailable) || vacation;
+            const hasConflict = (constraint?.unavailable) || vacation || recurringForShift;
 
             return (
               <div
@@ -1097,7 +1123,9 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
                 )}
                 {hasConflict && (
                   <div className="text-[9px] text-red-600 font-bold mt-1">
-                    {vacation ? `חופש: ${vacation.type}` : constraint?.notes || 'לא זמין'}
+                    {vacation ? `חופש: ${vacation.type}` : 
+                     recurringForShift ? `אילוץ קבוע: ${recurringForShift.notes || 'לא זמין'}` :
+                     constraint?.notes || 'לא זמין'}
                   </div>
                 )}
               </div>
@@ -1132,6 +1160,14 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
               <Button variant="outline">
                 <AlertCircle className="w-4 h-4 ml-2" />
                 כל האילוצים
+              </Button>
+            </Link>
+            <Link to={createPageUrl('RecurringConstraints')}>
+              <Button variant="outline">
+                🔄 אילוצים קבועים
+                {recurringConstraints.filter(rc => rc.status === 'ממתין לאישור').length > 0 && 
+                  ` (${recurringConstraints.filter(rc => rc.status === 'ממתין לאישור').length})`
+                }
               </Button>
             </Link>
             <Link to={createPageUrl('ManageEmployees')}>

@@ -145,7 +145,7 @@ export default function EmployeeConstraints() {
     mutationFn: (data) => base44.entities.RecurringConstraint.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries(['recurringConstraints']);
-      toast({ title: 'אילוץ חוזר נשמר בהצלחה' });
+      toast({ title: 'בקשת אילוץ קבוע נשלחה למנהל לאישור' });
       setRecurringDialogOpen(false);
     },
   });
@@ -217,7 +217,7 @@ export default function EmployeeConstraints() {
     );
     const dayNote = dayNotes.find(n => n.date === dateStr);
     
-    // בדוק אילוץ חוזר
+    // בדוק אילוץ חוזר (כולל כל הסטטוסים)
     const date = new Date(dateStr);
     const dayOfWeek = getDay(date);
     const recurringConstraint = recurringConstraints.find(rc => rc.day_of_week === dayOfWeek);
@@ -283,8 +283,16 @@ export default function EmployeeConstraints() {
           )}
           {recurringConstraint?.unavailable && (
             <div className="text-xs text-center">
-              <div className="font-bold text-orange-600">🔄 לא זמין</div>
-              <div className="text-orange-500 text-[10px]">אילוץ קבוע</div>
+              <div className={`font-bold ${
+                recurringConstraint.status === 'אושר' ? 'text-orange-600' :
+                recurringConstraint.status === 'נדחה' ? 'text-gray-600' :
+                'text-yellow-600'
+              }`}>🔄 לא זמין</div>
+              <div className={`text-[10px] ${
+                recurringConstraint.status === 'אושר' ? 'text-orange-500' :
+                recurringConstraint.status === 'נדחה' ? 'text-gray-500' :
+                'text-yellow-500'
+              }`}>אילוץ קבוע • {recurringConstraint.status}</div>
               {recurringConstraint.notes && (
                 <div className="text-[9px] text-orange-700 mt-1">{recurringConstraint.notes}</div>
               )}
@@ -295,6 +303,9 @@ export default function EmployeeConstraints() {
               {constraint.unavailable && <div className="font-bold text-red-600">לא זמין</div>}
               {constraint.preference && (
                 <div className="text-gray-700 text-[10px]">{constraint.preference}</div>
+              )}
+              {constraint.notes && (
+                <div className="text-gray-600 text-[9px] mt-1">💬 {constraint.notes}</div>
               )}
             </div>
           )}
@@ -404,11 +415,28 @@ export default function EmployeeConstraints() {
             <div className="space-y-2">
               {recurringConstraints.map(rc => {
                 const dayNames = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי'];
+                const statusBg = rc.status === 'אושר' ? 'bg-green-50 border-green-300' :
+                                rc.status === 'נדחה' ? 'bg-red-50 border-red-300' :
+                                'bg-yellow-50 border-yellow-300';
                 return (
-                  <div key={rc.id} className="flex items-center justify-between bg-white rounded p-3 border border-orange-300">
-                    <div>
-                      <div className="font-bold text-orange-900">יום {dayNames[rc.day_of_week]}</div>
-                      {rc.notes && <div className="text-sm text-orange-700 mt-1">{rc.notes}</div>}
+                  <div key={rc.id} className={`flex items-center justify-between rounded p-3 border ${statusBg}`}>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <div className="font-bold text-orange-900">יום {dayNames[rc.day_of_week]}</div>
+                        <Badge variant={
+                          rc.status === 'אושר' ? 'default' :
+                          rc.status === 'נדחה' ? 'destructive' :
+                          'secondary'
+                        } className="text-xs">
+                          {rc.status}
+                        </Badge>
+                      </div>
+                      {rc.notes && <div className="text-sm text-orange-700 mt-1">💬 {rc.notes}</div>}
+                      {rc.manager_notes && (
+                        <div className="text-xs text-gray-600 mt-2 bg-white rounded p-2">
+                          <strong>תגובת מנהל:</strong> {rc.manager_notes}
+                        </div>
+                      )}
                     </div>
                     <Button 
                       variant="destructive" 
@@ -846,6 +874,9 @@ function RecurringConstraintForm({ onSave }) {
       <div className="bg-orange-50 border-2 border-orange-400 rounded-lg p-4">
         <p className="text-sm text-orange-700">
           💡 אילוץ קבוע יחול על כל השבועות בכל החודשים. זה שימושי למקרים של לימודים, התחייבויות קבועות וכו'.
+        </p>
+        <p className="text-sm text-orange-700 mt-2 font-bold">
+          ⏳ הבקשה תישלח למנהל לאישור ותיכנס לתוקף רק לאחר אישור.
         </p>
       </div>
 

@@ -1,196 +1,274 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowRight, Plus, Trash2, LogOut } from 'lucide-react';
+import { ArrowRight, CheckCircle, XCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { useToast } from '@/components/ui/use-toast';
-import { Checkbox } from '@/components/ui/checkbox';
-
-const DAYS_OF_WEEK = [
-  { value: 0, label: 'ראשון' },
-  { value: 1, label: 'שני' },
-  { value: 2, label: 'שלישי' },
-  { value: 3, label: 'רביעי' },
-  { value: 4, label: 'חמישי' },
-  { value: 5, label: 'שישי' },
-];
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
 export default function RecurringConstraints() {
-  const [currentEmployee, setCurrentEmployee] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedDays, setSelectedDays] = useState([]);
-  const [notes, setNotes] = useState('');
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [managerNotes, setManagerNotes] = useState('');
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  useEffect(() => {
-    const loadEmployee = async () => {
-      try {
-        const user = await base44.auth.me();
-        const allEmployees = await base44.entities.Employee.list();
-        const employee = allEmployees.find(emp => emp.user_id === user.id);
-        setCurrentEmployee(employee);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadEmployee();
-  }, []);
+  const { data: employees = [] } = useQuery({
+    queryKey: ['employees'],
+    queryFn: () => base44.entities.Employee.list(),
+  });
 
   const { data: recurringConstraints = [] } = useQuery({
-    queryKey: ['recurringConstraints', currentEmployee?.id],
-    queryFn: async () => {
-      if (!currentEmployee) return [];
-      const all = await base44.entities.RecurringConstraint.list();
-      return all.filter(rc => rc.employee_id === currentEmployee.id);
-    },
-    enabled: !!currentEmployee,
+    queryKey: ['recurringConstraints'],
+    queryFn: () => base44.entities.RecurringConstraint.list('-created_date'),
   });
 
-  const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.RecurringConstraint.create(data),
+  const updateRecurringConstraintMutation = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.RecurringConstraint.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries(['recurringConstraints']);
-      toast({ title: 'אילוץ חוזר נוסף בהצלחה' });
-      setDialogOpen(false);
-      setSelectedDays([]);
-      setNotes('');
     },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.RecurringConstraint.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['recurringConstraints']);
-      toast({ title: 'אילוץ חוזר נמחק' });
-    },
-  });
+  const handleApprove = async (rc) => {
+    await updateRecurringConstraintMutation.mutateAsync({
+      id: rc.id,
+      data: { status: 'אושר' }
+    });
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (selectedDays.length === 0) {
-      toast({ title: 'בחר לפחות יום אחד', variant: 'destructive' });
-      return;
+    // שלח התראה לעובד
+    const employee = employees.find(e => e.id === rc.employee_id);
+    if (employee?.user_id) {
+      const dayNames = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי'];
+      await base44.entities.Notification.create({
+        user_id: employee.user_id,
+        employee_id: employee.id,
+        type: 'swap_approved',
+        title: 'אילוץ קבוע אושר',
+        message: `אילוץ קבוע שלך ליום ${dayNames[rc.day_of_week]} אושר על ידי המנהל`,
+      });
     }
 
-    // צור אילוץ חוזר לכל יום שנבחר
-    selectedDays.forEach(day => {
-      createMutation.mutate({
-        employee_id: currentEmployee.id,
-        day_of_week: day,
-        unavailable: true,
-        notes,
-      });
+    toast({ title: 'אילוץ קבוע אושר' });
+  };
+
+  const handleReject = async () => {
+    if (!selectedRequest) return;
+    
+    await updateRecurringConstraintMutation.mutateAsync({
+      id: selectedRequest.id,
+      data: { status: 'נדחה', manager_notes: managerNotes }
     });
+
+    // שלח התראה לעובד
+    const employee = employees.find(e => e.id === selectedRequest.employee_id);
+    if (employee?.user_id) {
+      const dayNames = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי'];
+      await base44.entities.Notification.create({
+        user_id: employee.user_id,
+        employee_id: employee.id,
+        type: 'swap_rejected',
+        title: 'אילוץ קבוע נדחה',
+        message: managerNotes || `אילוץ קבוע שלך ליום ${dayNames[selectedRequest.day_of_week]} נדחה על ידי המנהל`,
+      });
+    }
+
+    toast({ title: 'אילוץ קבוע נדחה' });
+    setRejectDialogOpen(false);
+    setSelectedRequest(null);
+    setManagerNotes('');
   };
 
-  const toggleDay = (day) => {
-    setSelectedDays(prev => 
-      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
-    );
+  const getEmployeeName = (empId) => {
+    const emp = employees.find(e => e.id === empId);
+    return emp?.full_name || 'לא ידוע';
   };
 
-  const getDayLabel = (dayNum) => {
-    const day = DAYS_OF_WEEK.find(d => d.value === dayNum);
-    return day?.label || 'לא ידוע';
-  };
+  const dayNames = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי'];
 
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center" dir="rtl">טוען...</div>;
-  }
-
-  if (!currentEmployee) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50 p-6" dir="rtl">
-        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md text-center">
-          <h2 className="text-2xl font-bold mb-4">חשבונך ממתין לחיבור</h2>
-          <p className="text-gray-600 mb-6">מנהל המערכת יחבר את חשבונך לרשומת העובד שלך בקרוב</p>
-          <Button onClick={() => base44.auth.logout()}>
-            <LogOut className="w-4 h-4 ml-2" />
-            יציאה
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  const pendingRequests = recurringConstraints.filter(rc => rc.status === 'ממתין לאישור');
+  const approvedRequests = recurringConstraints.filter(rc => rc.status === 'אושר');
+  const rejectedRequests = recurringConstraints.filter(rc => rc.status === 'נדחה');
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6" dir="rtl">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-6" dir="rtl">
+      <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
-          <h1 className="text-3xl font-bold">אילוצים חוזרים</h1>
-          <div className="flex gap-2">
-            <Link to={createPageUrl('EmployeeConstraints')}>
-              <Button variant="outline">
-                <ArrowRight className="w-4 h-4 ml-2" />
-                חזרה
-              </Button>
-            </Link>
-            <Button onClick={() => setDialogOpen(true)}>
-              <Plus className="w-4 h-4 ml-2" />
-              הוסף אילוץ חוזר
+          <h1 className="text-3xl font-bold">ניהול אילוצים קבועים</h1>
+          <Link to={createPageUrl('ManagerDashboard')}>
+            <Button variant="outline">
+              <ArrowRight className="w-4 h-4 ml-2" />
+              חזרה ללוח משמרות
             </Button>
-          </div>
+          </Link>
         </div>
 
-        <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4 mb-6">
-          <h3 className="font-bold text-blue-900 mb-2">💡 מהם אילוצים חוזרים?</h3>
-          <p className="text-blue-800 text-sm">
-            אילוצים חוזרים מאפשרים לך לסמן ימים בשבוע שבהם אתה לא זמין באופן קבוע.
-            <br />
-            לדוגמה: "אני לא זמין בכל יום ראשון" או "אני לא זמין בכל חמישי".
-            <br />
-            האילוצים האלה יחולו אוטומטית על כל השבועות, ולא תצטרך לסמן ידנית כל פעם.
+        <div className="bg-blue-50 border-2 border-blue-400 rounded-lg p-4 mb-6">
+          <h3 className="font-bold text-blue-900 mb-2">💡 מה זה אילוצים קבועים?</h3>
+          <p className="text-sm text-blue-700">
+            אילוצים קבועים הם ימים בשבוע שבהם עובד אינו זמין באופן קבוע (למשל: לימודים בכל יום שלישי).
+            בקשות אלו דורשות אישור שלך לפני שהן נכנסות לתוקף וחוסמות משמרות בסידור האוטומטי.
           </p>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          {recurringConstraints.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <p className="text-xl mb-2">אין אילוצים חוזרים</p>
-              <p className="text-sm">לחץ על "הוסף אילוץ חוזר" כדי להוסיף</p>
+        {/* בקשות ממתינות */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              ⏳ בקשות ממתינות לאישור
+              {pendingRequests.length > 0 && (
+                <Badge variant="secondary" className="text-lg">{pendingRequests.length}</Badge>
+              )}
+            </h2>
+            {pendingRequests.length > 0 && (
+              <div className="flex gap-2">
+                <Button 
+                  onClick={async () => {
+                    if (confirm(`האם לאשר את כל ${pendingRequests.length} הבקשות?`)) {
+                      for (const req of pendingRequests) {
+                        await handleApprove(req);
+                      }
+                    }
+                  }}
+                  variant="default"
+                  size="sm"
+                >
+                  אשר הכל
+                </Button>
+                <Button 
+                  onClick={async () => {
+                    const reason = prompt('הסבר (אופציונלי) לדחיית כל הבקשות:');
+                    if (reason !== null) {
+                      for (const req of pendingRequests) {
+                        await updateRecurringConstraintMutation.mutateAsync({
+                          id: req.id,
+                          data: { status: 'נדחה', manager_notes: reason || 'כל הבקשות נדחו' }
+                        });
+                      }
+                      toast({ title: `נדחו ${pendingRequests.length} בקשות` });
+                    }
+                  }}
+                  variant="destructive"
+                  size="sm"
+                >
+                  דחה הכל
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {pendingRequests.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <p>אין בקשות ממתינות לאישור</p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="text-right">עובד</TableHead>
                   <TableHead className="text-right">יום בשבוע</TableHead>
-                  <TableHead className="text-right">סטטוס</TableHead>
                   <TableHead className="text-right">הערות</TableHead>
                   <TableHead className="text-right">פעולות</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recurringConstraints.map((constraint) => (
-                  <TableRow key={constraint.id}>
-                    <TableCell className="font-medium text-lg">
-                      {getDayLabel(constraint.day_of_week)}
+                {pendingRequests.map((rc) => (
+                  <TableRow key={rc.id}>
+                    <TableCell className="font-medium">{getEmployeeName(rc.employee_id)}</TableCell>
+                    <TableCell>יום {dayNames[rc.day_of_week]}</TableCell>
+                    <TableCell className="max-w-xs">
+                      {rc.notes ? (
+                        <div className="text-sm">💬 {rc.notes}</div>
+                      ) : (
+                        <span className="text-gray-400">אין הערות</span>
+                      )}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="destructive">לא זמין</Badge>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => handleApprove(rc)}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          <CheckCircle className="w-4 h-4 ml-1" />
+                          אשר
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => {
+                            setSelectedRequest(rc);
+                            setRejectDialogOpen(true);
+                          }}
+                        >
+                          <XCircle className="w-4 h-4 ml-1" />
+                          דחה
+                        </Button>
+                      </div>
                     </TableCell>
-                    <TableCell>
-                      {constraint.notes || <span className="text-gray-400">-</span>}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+
+        {/* אילוצים מאושרים */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+            ✅ אילוצים מאושרים
+            {approvedRequests.length > 0 && (
+              <Badge variant="default" className="text-lg">{approvedRequests.length}</Badge>
+            )}
+          </h2>
+
+          {approvedRequests.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <p>אין אילוצים מאושרים</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-right">עובד</TableHead>
+                  <TableHead className="text-right">יום בשבוע</TableHead>
+                  <TableHead className="text-right">הערות</TableHead>
+                  <TableHead className="text-right">פעולות</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {approvedRequests.map((rc) => (
+                  <TableRow key={rc.id}>
+                    <TableCell className="font-medium">{getEmployeeName(rc.employee_id)}</TableCell>
+                    <TableCell>יום {dayNames[rc.day_of_week]}</TableCell>
+                    <TableCell className="max-w-xs">
+                      {rc.notes ? (
+                        <div className="text-sm">💬 {rc.notes}</div>
+                      ) : (
+                        <span className="text-gray-400">אין הערות</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Button
                         size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          if (confirm('האם למחוק אילוץ חוזר זה?')) {
-                            deleteMutation.mutate(constraint.id);
+                        variant="destructive"
+                        onClick={async () => {
+                          if (confirm('האם לבטל את האישור של אילוץ זה?')) {
+                            await updateRecurringConstraintMutation.mutateAsync({
+                              id: rc.id,
+                              data: { status: 'נדחה', manager_notes: 'אישור בוטל' }
+                            });
+                            toast({ title: 'אישור בוטל' });
                           }
                         }}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        בטל אישור
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -200,56 +278,101 @@ export default function RecurringConstraints() {
           )}
         </div>
 
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        {/* אילוצים נדחים */}
+        {rejectedRequests.length > 0 && (
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+              ❌ אילוצים נדחים
+              <Badge variant="destructive" className="text-lg">{rejectedRequests.length}</Badge>
+            </h2>
+
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-right">עובד</TableHead>
+                  <TableHead className="text-right">יום בשבוע</TableHead>
+                  <TableHead className="text-right">הערות עובד</TableHead>
+                  <TableHead className="text-right">הערות מנהל</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rejectedRequests.map((rc) => (
+                  <TableRow key={rc.id}>
+                    <TableCell className="font-medium">{getEmployeeName(rc.employee_id)}</TableCell>
+                    <TableCell>יום {dayNames[rc.day_of_week]}</TableCell>
+                    <TableCell className="max-w-xs">
+                      {rc.notes ? (
+                        <div className="text-sm">💬 {rc.notes}</div>
+                      ) : (
+                        <span className="text-gray-400">אין הערות</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="max-w-xs">
+                      {rc.manager_notes ? (
+                        <div className="text-sm text-gray-600">{rc.manager_notes}</div>
+                      ) : (
+                        <span className="text-gray-400">אין הערות</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+
+        {/* דיאלוג דחייה */}
+        <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
           <DialogContent dir="rtl">
             <DialogHeader>
-              <DialogTitle>הוסף אילוץ חוזר</DialogTitle>
+              <DialogTitle>דחיית בקשה לאילוץ קבוע</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label className="mb-3 block">בחר ימים בשבוע שבהם אתה לא זמין:</Label>
-                <div className="space-y-3 bg-gray-50 p-4 rounded-lg">
-                  {DAYS_OF_WEEK.map(day => (
-                    <div key={day.value} className="flex items-center gap-3">
-                      <Checkbox
-                        id={`day-${day.value}`}
-                        checked={selectedDays.includes(day.value)}
-                        onCheckedChange={() => toggleDay(day.value)}
-                      />
-                      <Label 
-                        htmlFor={`day-${day.value}`} 
-                        className="text-lg cursor-pointer"
-                      >
-                        כל יום {day.label}
-                      </Label>
+            <div className="space-y-4">
+              {selectedRequest && (
+                <div className="bg-gray-50 p-3 rounded border">
+                  <div className="text-sm">
+                    <strong>עובד:</strong> {getEmployeeName(selectedRequest.employee_id)}
+                  </div>
+                  <div className="text-sm">
+                    <strong>יום:</strong> {dayNames[selectedRequest.day_of_week]}
+                  </div>
+                  {selectedRequest.notes && (
+                    <div className="text-sm mt-2">
+                      <strong>הערות העובד:</strong> {selectedRequest.notes}
                     </div>
-                  ))}
+                  )}
                 </div>
-              </div>
-
+              )}
+              
               <div>
-                <Label>הערות (אופציונלי)</Label>
+                <Label>סיבת הדחייה (אופציונלי)</Label>
                 <Textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="למשל: לימודים, מילואים, עבודה נוספת..."
+                  value={managerNotes}
+                  onChange={(e) => setManagerNotes(e.target.value)}
+                  placeholder="הסבר קצר לעובד מדוע הבקשה נדחתה..."
                   rows={3}
                 />
               </div>
 
-              <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 text-sm text-amber-800">
-                ⚠️ האילוץ יחול על כל השבועות מעכשיו והלאה
-              </div>
-
               <div className="flex gap-3 justify-end">
-                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setRejectDialogOpen(false);
+                    setSelectedRequest(null);
+                    setManagerNotes('');
+                  }}
+                >
                   ביטול
                 </Button>
-                <Button type="submit" disabled={selectedDays.length === 0}>
-                  הוסף
+                <Button
+                  variant="destructive"
+                  onClick={handleReject}
+                >
+                  דחה בקשה
                 </Button>
               </div>
-            </form>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

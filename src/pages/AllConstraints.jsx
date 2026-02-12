@@ -102,7 +102,7 @@ export default function AllConstraints() {
       return employees.some(e => e.id === c.employee_id);
     });
     
-    // בדוק אילוצים חוזרים
+    // בדוק אילוצים חוזרים (כולל כל הסטטוסים)
     const dayRecurringConstraints = recurringConstraints.filter(rc => rc.day_of_week === dayOfWeek);
     
     // סינון לפי עובד נבחר
@@ -139,10 +139,13 @@ export default function AllConstraints() {
           {/* אילוצים חוזרים */}
           {filteredRecurringConstraints.map(rc => {
             const empName = getEmployeeName(rc.employee_id);
+            const statusColor = rc.status === 'אושר' ? 'bg-orange-200 border-orange-400' :
+                               rc.status === 'נדחה' ? 'bg-gray-200 border-gray-400' :
+                               'bg-yellow-200 border-yellow-400';
             return (
-              <div key={`rc-${rc.id}`} className="text-[10px] p-1 rounded bg-orange-200 border border-orange-400">
+              <div key={`rc-${rc.id}`} className={`text-[10px] p-1 rounded border ${statusColor}`}>
                 <div className="font-bold text-orange-900">🔄 {empName}</div>
-                <div className="text-orange-700">אילוץ קבוע</div>
+                <div className="text-orange-700 text-[9px]">אילוץ קבוע • {rc.status}</div>
                 {rc.notes && <div className="text-[9px] mt-1">{rc.notes}</div>}
               </div>
             );
@@ -161,9 +164,9 @@ export default function AllConstraints() {
                 }`}
               >
                 <div className="font-bold">{empName}</div>
-                {c.unavailable && <div className="text-red-700">לא זמין</div>}
+                {c.unavailable && <div className="text-red-700 text-[9px]">לא זמין</div>}
                 {c.preference && <div className="text-blue-700 text-[9px]">{c.preference}</div>}
-                {c.notes && <div className="text-gray-700 text-[9px] mt-1">{c.notes}</div>}
+                {c.notes && <div className="text-gray-700 text-[9px] mt-1">💬 {c.notes}</div>}
               </div>
             );
           })}

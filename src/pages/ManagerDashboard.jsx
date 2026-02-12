@@ -726,38 +726,10 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
         const shiftTypes = ['מסיים ב-17:30', 'מסיים ב-19:00'];
 
         for (const shiftType of shiftTypes) {
-          // בחר עובד למשמרת
           const preferredType = shiftType === 'מסיים ב-17:30' ? 'מעדיף מסיים ב-17:30' : 
                                 shiftType === 'מסיים ב-19:00' ? 'מעדיף מסיים ב-19:00' : null;
           
-          // לוגיקה מיוחדת לשישי - מוודא חלוקה הוגנת
-          let empId;
-          if (isFriday) {
-            // קודם כל נסה למצוא מישהו שלא עשה שישי כלל
-            const candidatesNoFriday = activeEmployees
-              .filter(emp => {
-                const stats = employeeStats[emp.id];
-                return stats.fridayCount === 0 && canAssignShift(emp.id, day, shiftType);
-              })
-              .sort((a, b) => {
-                // העדפה למשמרת
-                const aPreferred = a.preferred_shift_times && a.preferred_shift_times.includes(shiftType);
-                const bPreferred = b.preferred_shift_times && b.preferred_shift_times.includes(shiftType);
-                if (aPreferred !== bPreferred) return bPreferred ? 1 : -1;
-                
-                // מספר משמרות כולל
-                return employeeStats[a.id].totalShifts - employeeStats[b.id].totalShifts;
-              });
-            
-            if (candidatesNoFriday.length > 0) {
-              empId = candidatesNoFriday[0].id;
-            } else {
-              // אם לא נמצא מישהו שלא עשה שישי, נסה מישהו שעשה רק 1
-              empId = selectEmployeeForShift(day, shiftType, preferredType);
-            }
-          } else {
-            empId = selectEmployeeForShift(day, shiftType, preferredType);
-          }
+          let empId = selectEmployeeForShift(day, shiftType, preferredType);
 
           if (empId) {
             const employee = activeEmployees.find(e => e.id === empId);

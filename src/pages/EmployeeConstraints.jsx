@@ -348,7 +348,10 @@ export default function EmployeeConstraints() {
           <div className="flex gap-2 flex-wrap">
             {currentUser && <NotificationBell userId={currentUser.id} />}
             <Link to={createPageUrl('EmployeeShifts')}>
-              <Button variant="outline">המשמרות שלי</Button>
+              <Button variant="outline">
+                <ChevronRight className="w-4 h-4 ml-1" />
+                חזרה למשמרות
+              </Button>
             </Link>
             <Link to={createPageUrl('EmployeeSwaps')}>
               <Button variant="outline">החלפת משמרות</Button>
@@ -858,14 +861,28 @@ function VacationRequestForm({ onSave }) {
 }
 
 function RecurringConstraintForm({ onSave }) {
-  const [dayOfWeek, setDayOfWeek] = useState('');
+  const [selectedDays, setSelectedDays] = useState([]);
   const [notes, setNotes] = useState('');
 
-  const handleSubmit = (e) => {
+  const dayNames = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי'];
+
+  const toggleDay = (dayIndex) => {
+    if (selectedDays.includes(dayIndex)) {
+      setSelectedDays(selectedDays.filter(d => d !== dayIndex));
+    } else {
+      setSelectedDays([...selectedDays, dayIndex]);
+    }
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (dayOfWeek === '') return;
-    onSave({ day_of_week: parseInt(dayOfWeek), unavailable: true, notes });
-    setDayOfWeek('');
+    if (selectedDays.length === 0) return;
+    
+    for (const dayOfWeek of selectedDays) {
+      await onSave({ day_of_week: dayOfWeek, unavailable: true, notes });
+    }
+    
+    setSelectedDays([]);
     setNotes('');
   };
 
@@ -881,20 +898,28 @@ function RecurringConstraintForm({ onSave }) {
       </div>
 
       <div>
-        <Label>בחר יום בשבוע</Label>
-        <Select value={dayOfWeek} onValueChange={setDayOfWeek} required>
-          <SelectTrigger>
-            <SelectValue placeholder="בחר יום..." />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="0">ראשון</SelectItem>
-            <SelectItem value="1">שני</SelectItem>
-            <SelectItem value="2">שלישי</SelectItem>
-            <SelectItem value="3">רביעי</SelectItem>
-            <SelectItem value="4">חמישי</SelectItem>
-            <SelectItem value="5">שישי</SelectItem>
-          </SelectContent>
-        </Select>
+        <Label>בחר ימים בשבוע</Label>
+        <div className="grid grid-cols-3 gap-2 mt-2">
+          {dayNames.map((day, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => toggleDay(idx)}
+              className={`p-3 rounded-lg border-2 text-sm font-medium transition-all ${
+                selectedDays.includes(idx)
+                  ? 'bg-orange-600 text-white border-orange-600'
+                  : 'bg-white text-gray-700 border-gray-300 hover:border-orange-400'
+              }`}
+            >
+              {day}
+            </button>
+          ))}
+        </div>
+        {selectedDays.length > 0 && (
+          <div className="text-xs text-gray-600 mt-2">
+            נבחרו {selectedDays.length} ימים
+          </div>
+        )}
       </div>
 
       <div>
@@ -912,7 +937,9 @@ function RecurringConstraintForm({ onSave }) {
       </div>
 
       <div className="flex gap-3 justify-end">
-        <Button type="submit">שמור אילוץ קבוע</Button>
+        <Button type="submit" disabled={selectedDays.length === 0}>
+          שמור {selectedDays.length > 0 ? `${selectedDays.length} ` : ''}אילוצים קבועים
+        </Button>
       </div>
     </form>
   );

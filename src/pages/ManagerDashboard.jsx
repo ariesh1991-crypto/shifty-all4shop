@@ -646,48 +646,10 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
           const preferredType = shiftType === 'מסיים ב-17:30' ? 'מעדיף מסיים ב-17:30' : 
                                 shiftType === 'מסיים ב-19:00' ? 'מעדיף מסיים ב-19:00' : null;
           
-          // לוגיקה מיוחדת לשישי
+          // לוגיקה מיוחדת לשישי - מוודא חלוקה הוגנת
           let empId;
           if (isFriday) {
-            // נסה למצוא עובד שטרם עשה שישי בחודש
             empId = selectEmployeeForShift(day, shiftType, preferredType);
-            
-            // אם לא נמצא אף עובד, נסה למצוא מי שעשה רק שישי אחד
-            // ואם הוא עשה ארוך, עכשיו יעשה קצר
-            if (!empId && shiftType === 'שישי קצר') {
-              const candidatesWithOneFriday = activeEmployees
-                .filter(emp => {
-                  const stats = employeeStats[emp.id];
-                  return stats.fridayCount === 1 && 
-                         stats.fridayLongCount === 1 && 
-                         canAssignShift(emp.id, day, shiftType);
-                });
-              
-              if (candidatesWithOneFriday.length > 0) {
-                // בחר את מי שיש לו הכי פחות משמרות בסך הכל
-                candidatesWithOneFriday.sort((a, b) => 
-                  employeeStats[a.id].totalShifts - employeeStats[b.id].totalShifts
-                );
-                empId = candidatesWithOneFriday[0].id;
-              }
-            }
-            
-            if (!empId && shiftType === 'שישי ארוך') {
-              const candidatesWithOneFriday = activeEmployees
-                .filter(emp => {
-                  const stats = employeeStats[emp.id];
-                  return stats.fridayCount === 1 && 
-                         stats.fridayShortCount === 1 && 
-                         canAssignShift(emp.id, day, shiftType);
-                });
-              
-              if (candidatesWithOneFriday.length > 0) {
-                candidatesWithOneFriday.sort((a, b) => 
-                  employeeStats[a.id].totalShifts - employeeStats[b.id].totalShifts
-                );
-                empId = candidatesWithOneFriday[0].id;
-              }
-            }
           } else {
             empId = selectEmployeeForShift(day, shiftType, preferredType);
           }

@@ -539,10 +539,16 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
         const weekShifts = stats.weeklyShifts[weekNum] || 0;
         if (weekShifts >= 2) return false;
 
-        // בדוק מגבלת שישי (מקסימום 2 לחודש, אבל רק אם אין ברירה)
+        // בדוק מגבלת שישי (מקסימום 2 לחודש)
         if (isFridayShift && stats.fridayCount >= 2) return false;
 
-        // בדוק חוק חדש: משמרת שנייה בשבוע חייבת להיות מסוג שונה
+        // חוק חשוב: אם עובד כבר עשה שישי אחד, השני חייב להיות מסוג שונה
+        if (isFridayShift && stats.fridayCount === 1) {
+          if (shiftType === 'שישי ארוך' && stats.fridayLongCount > 0) return false;
+          if (shiftType === 'שישי קצר' && stats.fridayShortCount > 0) return false;
+        }
+
+        // בדוק חוק: משמרת שנייה בשבוע חייבת להיות מסוג שונה (לימים רגילים)
         if (!isFridayShift && weekShifts === 1) {
           const weekTypes = stats.weeklyShiftTypes[weekNum] || [];
           if (weekTypes.includes(shiftType)) {

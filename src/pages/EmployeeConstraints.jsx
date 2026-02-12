@@ -629,12 +629,6 @@ function ConstraintForm({ selectedDate, existingConstraint, onSave, onDelete }) 
 
   return (
     <div className="space-y-4">
-      {isFriday && (
-        <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-3 text-sm text-blue-700">
-          📅 זהו יום שישי - שים לב שכל עובד יכול לעבוד רק שישי אחד בחודש
-        </div>
-      )}
-
       <div className="bg-red-50 border-2 border-red-400 rounded-lg p-4 mb-4">
         <div className="flex items-center gap-3">
           <Switch 

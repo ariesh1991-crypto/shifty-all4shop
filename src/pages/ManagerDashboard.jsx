@@ -76,7 +76,6 @@ export default function ManagerDashboard() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [swapDialogOpen, setSwapDialogOpen] = useState(false);
   const [vacationDialogOpen, setVacationDialogOpen] = useState(false);
-  const [recurringDialogOpen, setRecurringDialogOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [scheduleAlerts, setScheduleAlerts] = useState([]);
@@ -927,43 +926,7 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
     }
   };
 
-  const handleCreateRecurringShifts = async (startDate, endDate, shiftType, employeeId) => {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const dates = eachDayOfInterval({ start, end });
-    
-    const employee = employees.find(e => e.id === employeeId);
-    if (!employee) return;
 
-    const newShifts = [];
-    for (const date of dates) {
-      const dayOfWeek = getDay(date);
-      if (dayOfWeek === 6) continue;
-
-      if (!validateShiftForDay(shiftType, dayOfWeek)) {
-        console.warn(`Skipping invalid shift: ${shiftType} on day ${dayOfWeek}`);
-        continue;
-      }
-
-      const dateStr = format(date, 'yyyy-MM-dd');
-      const times = calculateShiftTimes(shiftType, employee.contract_type);
-      
-      newShifts.push({
-        date: dateStr,
-        shift_type: shiftType,
-        assigned_employee_id: employeeId,
-        start_time: times.start,
-        end_time: times.end,
-        status: 'תקין',
-        schedule_status: 'טיוטה',
-      });
-    }
-
-    await base44.entities.Shift.bulkCreate(newShifts);
-    queryClient.invalidateQueries(['shifts']);
-    setRecurringDialogOpen(false);
-    toast({ title: `נוצרו ${newShifts.length} משמרות חוזרות` });
-  };
 
   const renderDay = (date) => {
     const dayOfWeek = getDay(date);
@@ -1154,10 +1117,7 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
                 בקשות חופשה {pendingVacations.length > 0 && `(${pendingVacations.length})`}
               </Button>
             </Link>
-            <Button onClick={() => setRecurringDialogOpen(true)} variant="outline">
-              <Plus className="w-4 h-4 ml-2" />
-              משמרות חוזרות
-            </Button>
+
             <Link to={createPageUrl('AllConstraints')}>
               <Button variant="outline">
                 <AlertCircle className="w-4 h-4 ml-2" />
@@ -1354,18 +1314,6 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
                 onClose={() => setDialogOpen(false)}
               />
             </div>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={recurringDialogOpen} onOpenChange={setRecurringDialogOpen}>
-          <DialogContent dir="rtl">
-            <DialogHeader>
-              <DialogTitle>יצירת משמרות חוזרות</DialogTitle>
-            </DialogHeader>
-            <RecurringShiftForm
-              employees={employees.filter(e => e.active)}
-              onCreate={handleCreateRecurringShifts}
-            />
           </DialogContent>
         </Dialog>
 
@@ -1787,61 +1735,7 @@ function ShiftEditor({ selectedDate, shifts, employees, onDelete, onUpdate, onCr
   );
 }
 
-function RecurringShiftForm({ employees, onCreate }) {
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [shiftType, setShiftType] = useState('');
-  const [employeeId, setEmployeeId] = useState('');
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onCreate(startDate, endDate, shiftType, employeeId);
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label>תאריך התחלה</Label>
-        <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
-      </div>
-      <div>
-        <Label>תאריך סיום</Label>
-        <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required />
-      </div>
-      <div>
-        <Label>סוג משמרת</Label>
-        <Select value={shiftType} onValueChange={setShiftType} required>
-          <SelectTrigger>
-            <SelectValue placeholder="בחר סוג משמרת..." />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="מסיים ב-17:30">מסיים ב-17:30 (ימים רגילים)</SelectItem>
-            <SelectItem value="מסיים ב-19:00">מסיים ב-19:00 (ימים רגילים)</SelectItem>
-            <SelectItem value="שישי קצר">שישי קצר</SelectItem>
-            <SelectItem value="שישי ארוך">שישי ארוך</SelectItem>
-          </SelectContent>
-        </Select>
-        <p className="text-xs text-gray-500 mt-1">
-          💡 המשמרת תישבץ רק בימים המתאימים (רגילים/שישי)
-        </p>
-      </div>
-      <div>
-        <Label>עובד</Label>
-        <Select value={employeeId} onValueChange={setEmployeeId} required>
-          <SelectTrigger>
-            <SelectValue placeholder="בחר עובד..." />
-          </SelectTrigger>
-          <SelectContent>
-            {employees.map(emp => (
-              <SelectItem key={emp.id} value={emp.id}>{emp.full_name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <Button type="submit" className="w-full">צור משמרות</Button>
-    </form>
-  );
-}
 
 function SwapRequestsManager({ swapRequests, shifts, employees, onApprove, onReject }) {
   const [selectedRequest, setSelectedRequest] = useState(null);

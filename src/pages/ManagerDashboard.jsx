@@ -578,6 +578,8 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
 
       // פונקציה לבחור עובד למשמרת (בחירה הוגנת + אופטימיזציה)
       const selectEmployeeForShift = (date, shiftType, preferredType = null) => {
+        const isFridayShift = shiftType.includes('שישי');
+        
         // מיון לפי מספר משמרות (מי שיש לו פחות יקבל קודם)
         let sortedEmployees = activeEmployees
           .map(emp => ({ emp, stats: employeeStats[emp.id] }))
@@ -588,7 +590,14 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
             const bPreferred = b.emp.preferred_shift_times && b.emp.preferred_shift_times.includes(shiftType);
             if (aPreferred !== bPreferred) return bPreferred ? 1 : -1;
             
-            // 2. מיון לפי מספר משמרות (איזון עומס)
+            // 2. במשמרות שישי - תן עדיפות למי שעשה פחות משמרות שישי
+            if (isFridayShift) {
+              if (a.stats.fridayCount !== b.stats.fridayCount) {
+                return a.stats.fridayCount - b.stats.fridayCount;
+              }
+            }
+            
+            // 3. מיון לפי מספר משמרות כולל (איזון עומס)
             return a.stats.totalShifts - b.stats.totalShifts;
           });
 

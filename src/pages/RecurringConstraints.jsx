@@ -11,10 +11,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function RecurringConstraints() {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [managerNotes, setManagerNotes] = useState('');
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -33,6 +35,15 @@ export default function RecurringConstraints() {
     mutationFn: ({ id, data }) => base44.entities.RecurringConstraint.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries(['recurringConstraints']);
+    },
+  });
+
+  const createRecurringConstraintMutation = useMutation({
+    mutationFn: (data) => base44.entities.RecurringConstraint.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['recurringConstraints']);
+      toast({ title: 'אילוץ קבוע נוצר בהצלחה' });
+      setCreateDialogOpen(false);
     },
   });
 
@@ -101,12 +112,17 @@ export default function RecurringConstraints() {
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
           <h1 className="text-3xl font-bold">ניהול אילוצים קבועים</h1>
-          <Link to={createPageUrl('ManagerDashboard')}>
-            <Button variant="outline">
-              <ArrowRight className="w-4 h-4 ml-2" />
-              חזרה ללוח משמרות
+          <div className="flex gap-3">
+            <Button onClick={() => setCreateDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700">
+              + צור אילוץ קבוע לעובד
             </Button>
-          </Link>
+            <Link to={createPageUrl('ManagerDashboard')}>
+              <Button variant="outline">
+                <ArrowRight className="w-4 h-4 ml-2" />
+                חזרה ללוח משמרות
+              </Button>
+            </Link>
+          </div>
         </div>
 
         <div className="bg-blue-50 border-2 border-blue-400 rounded-lg p-4 mb-6">
@@ -375,7 +391,97 @@ export default function RecurringConstraints() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* דיאלוג יצירת אילוץ קבוע */}
+        <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+          <DialogContent dir="rtl">
+            <DialogHeader>
+              <DialogTitle>יצירת אילוץ קבוע לעובד</DialogTitle>
+            </DialogHeader>
+            <CreateRecurringConstraintForm
+              employees={employees}
+              onSave={(data) => createRecurringConstraintMutation.mutate(data)}
+              onCancel={() => setCreateDialogOpen(false)}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
+  );
+}
+
+function CreateRecurringConstraintForm({ employees, onSave, onCancel }) {
+  const [employeeId, setEmployeeId] = useState('');
+  const [dayOfWeek, setDayOfWeek] = useState('');
+  const [notes, setNotes] = useState('');
+
+  const dayNames = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי'];
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!employeeId || dayOfWeek === '') return;
+    
+    onSave({
+      employee_id: employeeId,
+      day_of_week: parseInt(dayOfWeek),
+      unavailable: true,
+      notes,
+      status: 'אושר', // נוצר כבר מאושר כי המנהל יוצר אותו
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-3 text-sm text-blue-800">
+        💡 אילוץ זה ייכנס לתוקף מיידית ויחסום את העובד מסידור אוטומטי ביום זה בכל שבוע
+      </div>
+
+      <div>
+        <Label>בחר עובד</Label>
+        <Select value={employeeId} onValueChange={setEmployeeId} required>
+          <SelectTrigger>
+            <SelectValue placeholder="בחר עובד..." />
+          </SelectTrigger>
+          <SelectContent>
+            {employees.filter(e => e.active).map(emp => (
+              <SelectItem key={emp.id} value={emp.id}>{emp.full_name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <Label>בחר יום בשבוע</Label>
+        <Select value={dayOfWeek} onValueChange={setDayOfWeek} required>
+          <SelectTrigger>
+            <SelectValue placeholder="בחר יום..." />
+          </SelectTrigger>
+          <SelectContent>
+            {dayNames.map((day, idx) => (
+              <SelectItem key={idx} value={idx.toString()}>יום {day}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <Label>הערות (אופציונלי)</Label>
+        <Textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="למשל: לימודים, מילואים, התחייבות משפחתית..."
+          rows={3}
+        />
+      </div>
+
+      <div className="flex gap-3 justify-end">
+        <Button type="button" variant="outline" onClick={onCancel}>
+          ביטול
+        </Button>
+        <Button type="submit" disabled={!employeeId || dayOfWeek === ''}>
+          צור אילוץ קבוע
+        </Button>
+      </div>
+    </form>
   );
 }

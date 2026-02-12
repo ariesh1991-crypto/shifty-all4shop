@@ -33,6 +33,7 @@ export default function EmployeeConstraints() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [rangeDialogOpen, setRangeDialogOpen] = useState(false);
   const [vacationDialogOpen, setVacationDialogOpen] = useState(false);
+  const [recurringDialogOpen, setRecurringDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [calendarView, setCalendarView] = useState('month');
   const { toast } = useToast();
@@ -84,6 +85,16 @@ export default function EmployeeConstraints() {
     queryFn: () => base44.entities.DayNote.list(),
   });
 
+  const { data: recurringConstraints = [] } = useQuery({
+    queryKey: ['recurringConstraints', currentEmployee?.id],
+    queryFn: async () => {
+      if (!currentEmployee) return [];
+      const all = await base44.entities.RecurringConstraint.list();
+      return all.filter(rc => rc.employee_id === currentEmployee.id);
+    },
+    enabled: !!currentEmployee,
+  });
+
   const createConstraintMutation = useMutation({
     mutationFn: (data) => base44.entities.Constraint.create(data),
     onSuccess: () => {
@@ -116,6 +127,23 @@ export default function EmployeeConstraints() {
       queryClient.invalidateQueries(['vacationRequests']);
       toast({ title: 'בקשת חופשה נשלחה למנהל' });
       setVacationDialogOpen(false);
+    },
+  });
+
+  const createRecurringConstraintMutation = useMutation({
+    mutationFn: (data) => base44.entities.RecurringConstraint.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['recurringConstraints']);
+      toast({ title: 'אילוץ חוזר נשמר בהצלחה' });
+      setRecurringDialogOpen(false);
+    },
+  });
+
+  const deleteRecurringConstraintMutation = useMutation({
+    mutationFn: (id) => base44.entities.RecurringConstraint.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['recurringConstraints']);
+      toast({ title: 'אילוץ חוזר נמחק בהצלחה' });
     },
   });
 
@@ -166,7 +194,13 @@ export default function EmployeeConstraints() {
       dateStr <= v.end_date
     );
     const dayNote = dayNotes.find(n => n.date === dateStr);
-    return { constraint, approvedVacation, dayNote };
+    
+    // בדוק אילוץ חוזר
+    const date = new Date(dateStr);
+    const dayOfWeek = getDay(date);
+    const recurringConstraint = recurringConstraints.find(rc => rc.day_of_week === dayOfWeek);
+    
+    return { constraint, approvedVacation, dayNote, recurringConstraint };
   };
 
   const renderDay = (date) => {
@@ -174,11 +208,11 @@ export default function EmployeeConstraints() {
     if (dayOfWeek === 6) return null;
 
     const dateStr = format(date, 'yyyy-MM-dd');
-    const { constraint, approvedVacation, dayNote } = getConstraintsForDate(dateStr);
+    const { constraint, approvedVacation, dayNote, recurringConstraint } = getConstraintsForDate(dateStr);
     const dayNumber = format(date, 'd');
     
     // Count items for density indicator
-    const itemCount = (constraint ? 1 : 0) + (approvedVacation ? 1 : 0) + (dayNote ? 1 : 0);
+    const itemCount = (constraint ? 1 : 0) + (approvedVacation ? 1 : 0) + (dayNote ? 1 : 0) + (recurringConstraint ? 1 : 0);
     const hasMultipleItems = itemCount > 1;
 
     return (
@@ -188,6 +222,7 @@ export default function EmployeeConstraints() {
         className={`p-3 border-2 rounded-lg cursor-pointer hover:shadow-md min-h-[80px] relative ${
           dayNote ? 'bg-yellow-50 border-yellow-400' :
           approvedVacation ? 'bg-green-100 border-green-500' :
+          recurringConstraint?.unavailable ? 'bg-orange-100 border-orange-500' :
           constraint?.unavailable ? 'bg-red-100 border-red-400' :
           constraint?.preference === 'מעדיף לסיים ב-17:30' ? 'bg-blue-100 border-blue-400' :
           constraint?.preference === 'מעדיף לסיים ב-19:00' ? 'bg-purple-100 border-purple-400' :
@@ -222,6 +257,15 @@ export default function EmployeeConstraints() {
             <div className="text-xs text-center">
               <div className="font-bold text-green-700">✓ {approvedVacation.type}</div>
               <div className="text-green-600 text-[10px]">מאושר</div>
+            </div>
+          )}
+          {recurringConstraint?.unavailable && (
+            <div className="text-xs text-center">
+              <div className="font-bold text-orange-600">🔄 לא זמין</div>
+              <div className="text-orange-500 text-[10px]">אילוץ קבוע</div>
+              {recurringConstraint.notes && (
+                <div className="text-[9px] text-orange-700 mt-1">{recurringConstraint.notes}</div>
+              )}
             </div>
           )}
           {constraint && (
@@ -284,11 +328,9 @@ export default function EmployeeConstraints() {
               <Calendar className="w-4 h-4 ml-2" />
               סימון ימים מרובים
             </Button>
-            <Link to={createPageUrl('RecurringConstraints')}>
-              <Button variant="outline">
-                🔄 אילוצים חוזרים
-              </Button>
-            </Link>
+            <Button onClick={() => setRecurringDialogOpen(true)} variant="outline">
+              🔄 אילוצים קבועים
+            </Button>
             <Button 
               onClick={async () => {
                 if (confirm('האם אתה בטוח שברצונך למחוק את כל האילוצים שלך?')) {
@@ -332,6 +374,38 @@ export default function EmployeeConstraints() {
           </div>
         )}
 
+        {recurringConstraints.length > 0 && (
+          <div className="bg-orange-50 border-2 border-orange-400 rounded-lg p-4 mb-6">
+            <h3 className="font-bold text-orange-800 mb-3 flex items-center gap-2">
+              🔄 אילוצים קבועים שלך
+            </h3>
+            <div className="space-y-2">
+              {recurringConstraints.map(rc => {
+                const dayNames = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי'];
+                return (
+                  <div key={rc.id} className="flex items-center justify-between bg-white rounded p-3 border border-orange-300">
+                    <div>
+                      <div className="font-bold text-orange-900">יום {dayNames[rc.day_of_week]}</div>
+                      {rc.notes && <div className="text-sm text-orange-700 mt-1">{rc.notes}</div>}
+                    </div>
+                    <Button 
+                      variant="destructive" 
+                      size="sm"
+                      onClick={() => {
+                        if (confirm('האם למחוק אילוץ קבוע זה?')) {
+                          deleteRecurringConstraintMutation.mutate(rc.id);
+                        }
+                      }}
+                    >
+                      מחק
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
           <div className="flex justify-between items-start mb-4">
             <div>
@@ -340,6 +414,10 @@ export default function EmployeeConstraints() {
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 rounded bg-green-100 border-2 border-green-500"></div>
                   <span className="text-sm">חופש מאושר</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded bg-orange-100 border-2 border-orange-500"></div>
+                  <span className="text-sm">אילוץ קבוע (🔄)</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 rounded bg-red-100 border-2 border-red-400"></div>
@@ -497,6 +575,20 @@ export default function EmployeeConstraints() {
               שלח בקשה למנהל לאישור חופשה, מחלה או היעדרות אחרת
             </p>
             <VacationRequestForm onSave={handleVacationRequest} />
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={recurringDialogOpen} onOpenChange={setRecurringDialogOpen}>
+          <DialogContent dir="rtl" className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>הוסף אילוץ קבוע</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-gray-600 mb-4">
+              הגדר יום בשבוע שבו אינך זמין באופן קבוע (לדוגמא: לימודים)
+            </p>
+            <RecurringConstraintForm 
+              onSave={(data) => createRecurringConstraintMutation.mutate({ ...data, employee_id: currentEmployee.id })}
+            />
           </DialogContent>
         </Dialog>
       </div>
@@ -707,6 +799,64 @@ function VacationRequestForm({ onSave }) {
 
       <div className="flex gap-3 justify-end">
         <Button type="submit">שלח בקשה למנהל</Button>
+      </div>
+    </form>
+  );
+}
+
+function RecurringConstraintForm({ onSave }) {
+  const [dayOfWeek, setDayOfWeek] = useState('');
+  const [notes, setNotes] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (dayOfWeek === '') return;
+    onSave({ day_of_week: parseInt(dayOfWeek), unavailable: true, notes });
+    setDayOfWeek('');
+    setNotes('');
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="bg-orange-50 border-2 border-orange-400 rounded-lg p-4">
+        <p className="text-sm text-orange-700">
+          💡 אילוץ קבוע יחול על כל השבועות בכל החודשים. זה שימושי למקרים של לימודים, התחייבויות קבועות וכו'.
+        </p>
+      </div>
+
+      <div>
+        <Label>בחר יום בשבוע</Label>
+        <Select value={dayOfWeek} onValueChange={setDayOfWeek} required>
+          <SelectTrigger>
+            <SelectValue placeholder="בחר יום..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="0">ראשון</SelectItem>
+            <SelectItem value="1">שני</SelectItem>
+            <SelectItem value="2">שלישי</SelectItem>
+            <SelectItem value="3">רביעי</SelectItem>
+            <SelectItem value="4">חמישי</SelectItem>
+            <SelectItem value="5">שישי</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <Label>סיבה/הערות</Label>
+        <Textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="למשל: לימודים, התחייבות קבועה..."
+          rows={3}
+        />
+      </div>
+
+      <div className="bg-red-50 border border-red-300 rounded-lg p-3 text-sm text-red-700">
+        ⚠️ לאחר הוספת אילוץ קבוע, לא תשובץ לימים אלו בשום חודש. תוכל למחוק את האילוץ מעל כשהוא כבר לא רלוונטי.
+      </div>
+
+      <div className="flex gap-3 justify-end">
+        <Button type="submit">שמור אילוץ קבוע</Button>
       </div>
     </form>
   );

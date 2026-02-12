@@ -502,16 +502,27 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
 
       // פונקציה לבדוק אם עובד זמין
       const isEmployeeAvailable = (empId, dateStr) => {
+        const date = new Date(dateStr);
+        const dayOfWeek = getDay(date);
+        
+        // בדוק אילוץ ספציפי לתאריך
         const constraint = constraints.find(c => c.employee_id === empId && c.date === dateStr);
         if (constraint?.unavailable) return false;
         
-        // בדוק אילוצים חוזרים
-        const date = new Date(dateStr);
-        const dayOfWeek = getDay(date);
+        // בדוק אילוצים חוזרים (לימודים וכו')
         const recurringConstraint = recurringConstraints.find(
           rc => rc.employee_id === empId && rc.day_of_week === dayOfWeek && rc.unavailable
         );
         if (recurringConstraint) return false;
+        
+        // בדוק חופשה מאושרת
+        const vacation = vacationRequests.find(v => 
+          v.employee_id === empId && 
+          v.status === 'אושר' &&
+          dateStr >= v.start_date && 
+          dateStr <= v.end_date
+        );
+        if (vacation) return false;
         
         return true;
       };
@@ -606,15 +617,16 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
         }
       };
 
-      // פונקציה לבחור עובד למשמרת (בחירה הוגנת + אופטימיזציה)
+      // פונקציה לבחור עובד למשמרת (בחירה הוגנת + כיבוד העדפות)
       const selectEmployeeForShift = (date, shiftType, preferredType = null) => {
         const isFridayShift = shiftType.includes('שישי');
+        const dateStr = format(date, 'yyyy-MM-dd');
         
         // סינון עובדים שיכולים לקבל את המשמרת
         let candidates = activeEmployees.filter(emp => canAssignShift(emp.id, date, shiftType));
         
         if (candidates.length === 0) {
-          console.log(`❌ אין מועמדים עבור ${shiftType} ב-${format(date, 'yyyy-MM-dd')}`);
+          console.log(`❌ אין מועמדים עבור ${shiftType} ב-${dateStr}`);
           return null;
         }
 
@@ -623,13 +635,20 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
           const noFridayCandidates = candidates.filter(emp => employeeStats[emp.id].fridayCount === 0);
           
           if (noFridayCandidates.length > 0) {
+            // בדוק העדפות לשישי
+            const withPreference = noFridayCandidates.filter(emp => 
+              emp.preferred_shift_times && emp.preferred_shift_times.includes(shiftType)
+            );
+            
+            const finalCandidates = withPreference.length > 0 ? withPreference : noFridayCandidates;
+            
             // מיון לפי מספר משמרות כולל
-            noFridayCandidates.sort((a, b) => {
+            finalCandidates.sort((a, b) => {
               return employeeStats[a.id].totalShifts - employeeStats[b.id].totalShifts;
             });
             
-            const selected = noFridayCandidates[0];
-            console.log(`✅ נבחר ${selected.full_name} ל-${shiftType} ב-${format(date, 'yyyy-MM-dd')} (0 שישי)`);
+            const selected = finalCandidates[0];
+            console.log(`✅ נבחר ${selected.full_name} ל-${shiftType} ב-${dateStr} (0 שישי, ${employeeStats[selected.id].totalShifts} משמרות)`);
             return selected.id;
           }
           
@@ -640,36 +659,53 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
             if (aStats.fridayCount !== bStats.fridayCount) {
               return aStats.fridayCount - bStats.fridayCount;
             }
+            // בדוק העדפה
+            const aPreferred = a.preferred_shift_times && a.preferred_shift_times.includes(shiftType);
+            const bPreferred = b.preferred_shift_times && b.preferred_shift_times.includes(shiftType);
+            if (aPreferred !== bPreferred) return bPreferred ? 1 : -1;
+            
             return aStats.totalShifts - bStats.totalShifts;
           });
           
           const selected = candidates[0];
-          console.log(`✅ נבחר ${selected.full_name} ל-${shiftType} ב-${format(date, 'yyyy-MM-dd')} (${employeeStats[selected.id].fridayCount} שישי)`);
+          console.log(`✅ נבחר ${selected.full_name} ל-${shiftType} ב-${dateStr} (${employeeStats[selected.id].fridayCount} שישי, ${employeeStats[selected.id].totalShifts} משמרות)`);
           return selected.id;
         }
         
-        // משמרות רגילות (לא שישי) - מיון לפי מספר משמרות כולל
-        candidates.sort((a, b) => {
-          const aPreferred = a.preferred_shift_times && a.preferred_shift_times.includes(shiftType);
-          const bPreferred = b.preferred_shift_times && b.preferred_shift_times.includes(shiftType);
-          if (aPreferred !== bPreferred) return bPreferred ? 1 : -1;
-          
+        // משמרות רגילות - תן עדיפות להעדפות מפורשות
+        // קודם בדוק אם יש מישהו עם העדפה מפורשת בתאריך הזה
+        const withDatePreference = candidates.filter(emp => {
+          const constraint = constraints.find(c => 
+            c.employee_id === emp.id && 
+            c.date === dateStr &&
+            c.preference === preferredType
+          );
+          return constraint !== undefined;
+        });
+        
+        if (withDatePreference.length > 0) {
+          // מיון לפי מספר משמרות
+          withDatePreference.sort((a, b) => employeeStats[a.id].totalShifts - employeeStats[b.id].totalShifts);
+          const selected = withDatePreference[0];
+          console.log(`✅ נבחר ${selected.full_name} ל-${shiftType} ב-${dateStr} (העדפה בתאריך)`);
+          return selected.id;
+        }
+        
+        // אחרת, בדוק העדפות כלליות
+        const withGeneralPreference = candidates.filter(emp => 
+          emp.preferred_shift_times && emp.preferred_shift_times.includes(shiftType)
+        );
+        
+        const finalCandidates = withGeneralPreference.length > 0 ? withGeneralPreference : candidates;
+        
+        // מיון לפי מספר משמרות כולל
+        finalCandidates.sort((a, b) => {
           return employeeStats[a.id].totalShifts - employeeStats[b.id].totalShifts;
         });
 
-        // נסה למצוא עובד עם העדפה מתאימה מה-constraints
-        if (preferredType) {
-          const preferred = candidates.find(emp => {
-            const constraint = constraints.find(c => 
-              c.employee_id === emp.id && 
-              c.date === format(date, 'yyyy-MM-dd')
-            );
-            return constraint && constraint.preference === preferredType;
-          });
-          if (preferred) return preferred.id;
-        }
-
-        return candidates[0].id;
+        const selected = finalCandidates[0];
+        console.log(`✅ נבחר ${selected.full_name} ל-${shiftType} ב-${dateStr} (${employeeStats[selected.id].totalShifts} משמרות)`);
+        return selected.id;
       };
 
       const newShifts = [];
@@ -748,17 +784,34 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
             const employee = activeEmployees.find(e => e.id === empId);
             const times = calculateShiftTimes(shiftType, employee.contract_type);
             
-            // בדוק חריגות
+            // בדוק חריגות - אילוץ ספציפי
             const constraint = constraints.find(c => c.employee_id === empId && c.date === dateStr);
             if (constraint && constraint.unavailable) {
               alerts.push({
-                type: 'warning',
+                type: 'error',
                 employeeId: empId,
                 employeeName: employee.full_name,
                 date: dateStr,
                 shiftType: shiftType,
                 message: `${employee.full_name} שובץ למשמרת ${shiftType} ב-${dateStr} למרות שסומן כלא זמין`,
                 reason: constraint.notes || 'לא זמין'
+              });
+            }
+
+            // בדוק אילוץ חוזר
+            const dayOfWeek = getDay(new Date(dateStr));
+            const recurringConstraint = recurringConstraints.find(
+              rc => rc.employee_id === empId && rc.day_of_week === dayOfWeek && rc.unavailable
+            );
+            if (recurringConstraint) {
+              alerts.push({
+                type: 'error',
+                employeeId: empId,
+                employeeName: employee.full_name,
+                date: dateStr,
+                shiftType: shiftType,
+                message: `${employee.full_name} שובץ למשמרת ${shiftType} ב-${dateStr} למרות אילוץ קבוע`,
+                reason: recurringConstraint.notes || 'אילוץ קבוע (לימודים/התחייבות)'
               });
             }
 

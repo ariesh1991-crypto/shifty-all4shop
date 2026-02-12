@@ -24,7 +24,7 @@ export default function NotificationBell({ userId }) {
   const markAsReadMutation = useMutation({
     mutationFn: (id) => base44.entities.Notification.update(id, { read: true }),
     onSuccess: () => {
-      queryClient.invalidateQueries(['notifications']);
+      queryClient.invalidateQueries({ queryKey: ['notifications', userId] });
     },
   });
 

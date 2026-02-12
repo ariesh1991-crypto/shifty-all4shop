@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { ArrowLeftRight, LogOut, ArrowRight, Bell } from 'lucide-react';
+import { ArrowLeftRight, LogOut, ArrowRight } from 'lucide-react';
 import NotificationBell from '../components/notifications/NotificationBell';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';

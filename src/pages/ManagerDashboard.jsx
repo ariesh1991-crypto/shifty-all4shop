@@ -659,7 +659,28 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
           // לוגיקה מיוחדת לשישי - מוודא חלוקה הוגנת
           let empId;
           if (isFriday) {
-            empId = selectEmployeeForShift(day, shiftType, preferredType);
+            // קודם כל נסה למצוא מישהו שלא עשה שישי כלל
+            const candidatesNoFriday = activeEmployees
+              .filter(emp => {
+                const stats = employeeStats[emp.id];
+                return stats.fridayCount === 0 && canAssignShift(emp.id, day, shiftType);
+              })
+              .sort((a, b) => {
+                // העדפה למשמרת
+                const aPreferred = a.preferred_shift_times && a.preferred_shift_times.includes(shiftType);
+                const bPreferred = b.preferred_shift_times && b.preferred_shift_times.includes(shiftType);
+                if (aPreferred !== bPreferred) return bPreferred ? 1 : -1;
+                
+                // מספר משמרות כולל
+                return employeeStats[a.id].totalShifts - employeeStats[b.id].totalShifts;
+              });
+            
+            if (candidatesNoFriday.length > 0) {
+              empId = candidatesNoFriday[0].id;
+            } else {
+              // אם לא נמצא מישהו שלא עשה שישי, נסה מישהו שעשה רק 1
+              empId = selectEmployeeForShift(day, shiftType, preferredType);
+            }
           } else {
             empId = selectEmployeeForShift(day, shiftType, preferredType);
           }

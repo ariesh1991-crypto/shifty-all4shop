@@ -591,19 +591,29 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
           .map(emp => ({ emp, stats: employeeStats[emp.id] }))
           .filter(({ emp }) => canAssignShift(emp.id, date, shiftType))
           .sort((a, b) => {
+            // במשמרות שישי - עדיפות מוחלטת למי שעשה 0 משמרות שישי
+            if (isFridayShift) {
+              // קודם כל, מי שלא עשה שישי כלל
+              if (a.stats.fridayCount === 0 && b.stats.fridayCount > 0) return -1;
+              if (b.stats.fridayCount === 0 && a.stats.fridayCount > 0) return 1;
+              
+              // אם שניהם עשו 0 או שניהם עשו יותר מ-0, אז:
+              // 1. תן עדיפות לעובדים שזו המשמרת המועדפת שלהם
+              const aPreferred = a.emp.preferred_shift_times && a.emp.preferred_shift_times.includes(shiftType);
+              const bPreferred = b.emp.preferred_shift_times && b.emp.preferred_shift_times.includes(shiftType);
+              if (aPreferred !== bPreferred) return bPreferred ? 1 : -1;
+              
+              // 2. תן עדיפות למי שעשה פחות משמרות בסך הכל
+              return a.stats.totalShifts - b.stats.totalShifts;
+            }
+            
+            // משמרות רגילות (לא שישי)
             // 1. תן עדיפות לעובדים שזו המשמרת המועדפת שלהם
             const aPreferred = a.emp.preferred_shift_times && a.emp.preferred_shift_times.includes(shiftType);
             const bPreferred = b.emp.preferred_shift_times && b.emp.preferred_shift_times.includes(shiftType);
             if (aPreferred !== bPreferred) return bPreferred ? 1 : -1;
             
-            // 2. במשמרות שישי - תן עדיפות למי שעשה פחות משמרות שישי
-            if (isFridayShift) {
-              if (a.stats.fridayCount !== b.stats.fridayCount) {
-                return a.stats.fridayCount - b.stats.fridayCount;
-              }
-            }
-            
-            // 3. מיון לפי מספר משמרות כולל (איזון עומס)
+            // 2. מיון לפי מספר משמרות כולל (איזון עומס)
             return a.stats.totalShifts - b.stats.totalShifts;
           });
 

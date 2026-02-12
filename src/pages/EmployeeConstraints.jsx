@@ -147,10 +147,21 @@ export default function EmployeeConstraints() {
     },
   });
 
-  const handleSaveConstraint = (constraintData) => {
-    const existing = constraints.find(c => c.date === selectedDate);
-    if (existing) {
-      updateConstraintMutation.mutate({ id: existing.id, data: constraintData });
+  const handleSaveConstraint = async (constraintData) => {
+    // מחק כל האילוצים הקיימים לתאריך זה (אם יש כפילויות)
+    const existingForDate = constraints.filter(c => c.date === selectedDate);
+    
+    if (existingForDate.length > 0) {
+      // אם יש אילוץ אחד - עדכן אותו
+      if (existingForDate.length === 1) {
+        updateConstraintMutation.mutate({ id: existingForDate[0].id, data: constraintData });
+      } else {
+        // אם יש כפילויות - מחק את כולם ויצור אחד חדש
+        for (const dup of existingForDate) {
+          await deleteConstraintMutation.mutateAsync(dup.id);
+        }
+        createConstraintMutation.mutate({ ...constraintData, employee_id: currentEmployee.id, date: selectedDate });
+      }
     } else {
       createConstraintMutation.mutate({ ...constraintData, employee_id: currentEmployee.id, date: selectedDate });
     }

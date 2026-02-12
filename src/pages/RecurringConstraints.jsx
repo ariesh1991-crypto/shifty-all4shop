@@ -40,10 +40,9 @@ export default function RecurringConstraints() {
 
   const createRecurringConstraintMutation = useMutation({
     mutationFn: (data) => base44.entities.RecurringConstraint.create(data),
-    onSuccess: () => {
+    onSuccess: (data, variables, context) => {
       queryClient.invalidateQueries(['recurringConstraints']);
-      toast({ title: 'אילוץ קבוע נוצר בהצלחה' });
-      setCreateDialogOpen(false);
+      // לא מציגים toast כאן, הטופס יציג אחד בסוף
     },
   });
 
@@ -400,8 +399,14 @@ export default function RecurringConstraints() {
             </DialogHeader>
             <CreateRecurringConstraintForm
               employees={employees}
-              onSave={(data) => createRecurringConstraintMutation.mutate(data)}
+              onSave={async (data) => {
+                await createRecurringConstraintMutation.mutateAsync(data);
+              }}
               onCancel={() => setCreateDialogOpen(false)}
+              onComplete={(count) => {
+                toast({ title: `${count} אילוצים קבועים נוצרו בהצלחה` });
+                setCreateDialogOpen(false);
+              }}
             />
           </DialogContent>
         </Dialog>
@@ -410,24 +415,37 @@ export default function RecurringConstraints() {
   );
 }
 
-function CreateRecurringConstraintForm({ employees, onSave, onCancel }) {
+function CreateRecurringConstraintForm({ employees, onSave, onCancel, onComplete }) {
   const [employeeId, setEmployeeId] = useState('');
-  const [dayOfWeek, setDayOfWeek] = useState('');
+  const [selectedDays, setSelectedDays] = useState([]);
   const [notes, setNotes] = useState('');
 
   const dayNames = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי'];
 
-  const handleSubmit = (e) => {
+  const toggleDay = (dayIndex) => {
+    if (selectedDays.includes(dayIndex)) {
+      setSelectedDays(selectedDays.filter(d => d !== dayIndex));
+    } else {
+      setSelectedDays([...selectedDays, dayIndex]);
+    }
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!employeeId || dayOfWeek === '') return;
+    if (!employeeId || selectedDays.length === 0) return;
     
-    onSave({
-      employee_id: employeeId,
-      day_of_week: parseInt(dayOfWeek),
-      unavailable: true,
-      notes,
-      status: 'אושר', // נוצר כבר מאושר כי המנהל יוצר אותו
-    });
+    // צור אילוץ לכל יום שנבחר
+    for (const dayOfWeek of selectedDays) {
+      await onSave({
+        employee_id: employeeId,
+        day_of_week: dayOfWeek,
+        unavailable: true,
+        notes,
+        status: 'אושר', // נוצר כבר מאושר כי המנהל יוצר אותו
+      });
+    }
+    
+    onComplete(selectedDays.length);
   };
 
   return (
@@ -451,17 +469,28 @@ function CreateRecurringConstraintForm({ employees, onSave, onCancel }) {
       </div>
 
       <div>
-        <Label>בחר יום בשבוע</Label>
-        <Select value={dayOfWeek} onValueChange={setDayOfWeek} required>
-          <SelectTrigger>
-            <SelectValue placeholder="בחר יום..." />
-          </SelectTrigger>
-          <SelectContent>
-            {dayNames.map((day, idx) => (
-              <SelectItem key={idx} value={idx.toString()}>יום {day}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Label>בחר ימים בשבוע</Label>
+        <div className="grid grid-cols-3 gap-2 mt-2">
+          {dayNames.map((day, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => toggleDay(idx)}
+              className={`p-3 rounded-lg border-2 text-sm font-medium transition-all ${
+                selectedDays.includes(idx)
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400'
+              }`}
+            >
+              {day}
+            </button>
+          ))}
+        </div>
+        {selectedDays.length > 0 && (
+          <div className="text-xs text-gray-600 mt-2">
+            נבחרו {selectedDays.length} ימים
+          </div>
+        )}
       </div>
 
       <div>
@@ -478,8 +507,8 @@ function CreateRecurringConstraintForm({ employees, onSave, onCancel }) {
         <Button type="button" variant="outline" onClick={onCancel}>
           ביטול
         </Button>
-        <Button type="submit" disabled={!employeeId || dayOfWeek === ''}>
-          צור אילוץ קבוע
+        <Button type="submit" disabled={!employeeId || selectedDays.length === 0}>
+          צור {selectedDays.length > 0 ? `${selectedDays.length} ` : ''}אילוצים קבועים
         </Button>
       </div>
     </form>

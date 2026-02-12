@@ -642,8 +642,17 @@ function ConstraintForm({ selectedDate, existingConstraint, onSave, onDelete }) 
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="none">ללא העדפה</SelectItem>
-              <SelectItem value="מעדיף לסיים ב-17:30">מעדיף לסיים ב-17:30</SelectItem>
-              <SelectItem value="מעדיף לסיים ב-19:00">מעדיף לסיים ב-19:00</SelectItem>
+              {isFriday ? (
+                <>
+                  <SelectItem value="שישי קצר">שישי קצר (08:30-12:00)</SelectItem>
+                  <SelectItem value="שישי ארוך">שישי ארוך (08:00-14:00)</SelectItem>
+                </>
+              ) : (
+                <>
+                  <SelectItem value="מעדיף לסיים ב-17:30">מעדיף לסיים ב-17:30</SelectItem>
+                  <SelectItem value="מעדיף לסיים ב-19:00">מעדיף לסיים ב-19:00</SelectItem>
+                </>
+              )}
             </SelectContent>
           </Select>
         </div>

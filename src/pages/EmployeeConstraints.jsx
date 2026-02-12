@@ -23,7 +23,11 @@ import AgendaView from '../components/shifts/AgendaView';
 import { AlertTriangle } from 'lucide-react';
 
 export default function EmployeeConstraints() {
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(() => {
+    const nextMonth = new Date();
+    nextMonth.setMonth(nextMonth.getMonth() + 1);
+    return nextMonth;
+  });
   const [currentEmployee, setCurrentEmployee] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);

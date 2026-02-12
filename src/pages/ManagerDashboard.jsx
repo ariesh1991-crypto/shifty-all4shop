@@ -610,53 +610,66 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
       const selectEmployeeForShift = (date, shiftType, preferredType = null) => {
         const isFridayShift = shiftType.includes('שישי');
         
-        // מיון לפי מספר משמרות (מי שיש לו פחות יקבל קודם)
-        let sortedEmployees = activeEmployees
-          .map(emp => ({ emp, stats: employeeStats[emp.id] }))
-          .filter(({ emp }) => canAssignShift(emp.id, date, shiftType))
-          .sort((a, b) => {
-            // במשמרות שישי - עדיפות מוחלטת למי שעשה 0 משמרות שישי
-            if (isFridayShift) {
-              // קודם כל, מי שלא עשה שישי כלל
-              if (a.stats.fridayCount === 0 && b.stats.fridayCount > 0) return -1;
-              if (b.stats.fridayCount === 0 && a.stats.fridayCount > 0) return 1;
-              
-              // אם שניהם עשו 0 או שניהם עשו יותר מ-0, אז:
-              // 1. תן עדיפות לעובדים שזו המשמרת המועדפת שלהם
-              const aPreferred = a.emp.preferred_shift_times && a.emp.preferred_shift_times.includes(shiftType);
-              const bPreferred = b.emp.preferred_shift_times && b.emp.preferred_shift_times.includes(shiftType);
-              if (aPreferred !== bPreferred) return bPreferred ? 1 : -1;
-              
-              // 2. תן עדיפות למי שעשה פחות משמרות בסך הכל
-              return a.stats.totalShifts - b.stats.totalShifts;
-            }
-            
-            // משמרות רגילות (לא שישי)
-            // 1. תן עדיפות לעובדים שזו המשמרת המועדפת שלהם
-            const aPreferred = a.emp.preferred_shift_times && a.emp.preferred_shift_times.includes(shiftType);
-            const bPreferred = b.emp.preferred_shift_times && b.emp.preferred_shift_times.includes(shiftType);
-            if (aPreferred !== bPreferred) return bPreferred ? 1 : -1;
-            
-            // 2. מיון לפי מספר משמרות כולל (איזון עומס)
-            return a.stats.totalShifts - b.stats.totalShifts;
-          });
+        // סינון עובדים שיכולים לקבל את המשמרת
+        let candidates = activeEmployees.filter(emp => canAssignShift(emp.id, date, shiftType));
+        
+        if (candidates.length === 0) {
+          console.log(`❌ אין מועמדים עבור ${shiftType} ב-${format(date, 'yyyy-MM-dd')}`);
+          return null;
+        }
 
-        if (sortedEmployees.length === 0) return null;
+        // במשמרות שישי - תן עדיפות מוחלטת למי שלא עשה שישי כלל
+        if (isFridayShift) {
+          const noFridayCandidates = candidates.filter(emp => employeeStats[emp.id].fridayCount === 0);
+          
+          if (noFridayCandidates.length > 0) {
+            // מיון לפי מספר משמרות כולל
+            noFridayCandidates.sort((a, b) => {
+              return employeeStats[a.id].totalShifts - employeeStats[b.id].totalShifts;
+            });
+            
+            const selected = noFridayCandidates[0];
+            console.log(`✅ נבחר ${selected.full_name} ל-${shiftType} ב-${format(date, 'yyyy-MM-dd')} (0 שישי)`);
+            return selected.id;
+          }
+          
+          // אם כולם כבר עשו שישי, קח את מי שעשה הכי פחות
+          candidates.sort((a, b) => {
+            const aStats = employeeStats[a.id];
+            const bStats = employeeStats[b.id];
+            if (aStats.fridayCount !== bStats.fridayCount) {
+              return aStats.fridayCount - bStats.fridayCount;
+            }
+            return aStats.totalShifts - bStats.totalShifts;
+          });
+          
+          const selected = candidates[0];
+          console.log(`✅ נבחר ${selected.full_name} ל-${shiftType} ב-${format(date, 'yyyy-MM-dd')} (${employeeStats[selected.id].fridayCount} שישי)`);
+          return selected.id;
+        }
+        
+        // משמרות רגילות (לא שישי) - מיון לפי מספר משמרות כולל
+        candidates.sort((a, b) => {
+          const aPreferred = a.preferred_shift_times && a.preferred_shift_times.includes(shiftType);
+          const bPreferred = b.preferred_shift_times && b.preferred_shift_times.includes(shiftType);
+          if (aPreferred !== bPreferred) return bPreferred ? 1 : -1;
+          
+          return employeeStats[a.id].totalShifts - employeeStats[b.id].totalShifts;
+        });
 
         // נסה למצוא עובד עם העדפה מתאימה מה-constraints
         if (preferredType) {
-          const preferred = sortedEmployees.find(({ emp }) => {
+          const preferred = candidates.find(emp => {
             const constraint = constraints.find(c => 
               c.employee_id === emp.id && 
               c.date === format(date, 'yyyy-MM-dd')
             );
             return constraint && constraint.preference === preferredType;
           });
-          if (preferred) return preferred.emp.id;
+          if (preferred) return preferred.id;
         }
 
-        // אחרת - תן למי שיש פחות משמרות (ראש הרשימה)
-        return sortedEmployees[0].emp.id;
+        return candidates[0].id;
       };
 
       const newShifts = [];

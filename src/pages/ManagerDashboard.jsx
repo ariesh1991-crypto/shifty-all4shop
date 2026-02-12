@@ -663,17 +663,67 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
       const unassignedShifts = [];
       const alerts = [];
 
-      // צור משמרות לכל יום
+      // קודם כל - צור משמרות שישי (בעדיפות ראשונה)
+      const fridayDays = days.filter(day => getDay(day) === 5);
+      for (const day of fridayDays) {
+        const dateStr = format(day, 'yyyy-MM-dd');
+        const fridayShiftTypes = ['שישי ארוך', 'שישי קצר'];
+
+        for (const shiftType of fridayShiftTypes) {
+          // קודם כל נסה למצוא מישהו שלא עשה שישי כלל
+          const candidatesNoFriday = activeEmployees
+            .filter(emp => {
+              const stats = employeeStats[emp.id];
+              return stats.fridayCount === 0 && canAssignShift(emp.id, day, shiftType);
+            })
+            .sort((a, b) => {
+              // מספר משמרות כולל
+              return employeeStats[a.id].totalShifts - employeeStats[b.id].totalShifts;
+            });
+          
+          let empId = null;
+          if (candidatesNoFriday.length > 0) {
+            empId = candidatesNoFriday[0].id;
+          } else {
+            // אם לא נמצא מישהו שלא עשה שישי, נסה מישהו שעשה רק 1
+            empId = selectEmployeeForShift(day, shiftType, null);
+          }
+
+          if (empId) {
+            const employee = activeEmployees.find(e => e.id === empId);
+            const times = calculateShiftTimes(shiftType, employee.contract_type);
+            
+            newShifts.push({
+              date: dateStr,
+              shift_type: shiftType,
+              assigned_employee_id: empId,
+              start_time: times.start,
+              end_time: times.end,
+              status: 'תקין',
+              schedule_status: 'טיוטה',
+            });
+
+            assignShift(empId, day, shiftType);
+          } else {
+            newShifts.push({
+              date: dateStr,
+              shift_type: shiftType,
+              status: 'בעיה',
+              schedule_status: 'טיוטה',
+              exception_reason: 'אין עובד זמין למשמרת שישי',
+            });
+            unassignedShifts.push({ date: dateStr, type: shiftType });
+          }
+        }
+      }
+
+      // עכשיו צור משמרות רגילות (לא שישי)
       for (const day of days) {
         const dayOfWeek = getDay(day);
-        if (dayOfWeek === 6) continue; // דלג על שבת
+        if (dayOfWeek === 6 || dayOfWeek === 5) continue; // דלג על שבת ושישי (כבר טיפלנו)
 
         const dateStr = format(day, 'yyyy-MM-dd');
-        const isFriday = dayOfWeek === 5;
-
-        const shiftTypes = isFriday
-          ? ['שישי ארוך', 'שישי קצר'] // ארוך קודם - צריך מישהו קבוע בארוכה
-          : ['מסיים ב-17:30', 'מסיים ב-19:00'];
+        const shiftTypes = ['מסיים ב-17:30', 'מסיים ב-19:00'];
 
         for (const shiftType of shiftTypes) {
           // בחר עובד למשמרת

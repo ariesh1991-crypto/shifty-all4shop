@@ -65,7 +65,18 @@ export default function EmployeeConstraints() {
     queryFn: async () => {
       if (!currentEmployee) return [];
       const all = await base44.entities.Constraint.list();
-      return all.filter(c => c.employee_id === currentEmployee.id && c.date.startsWith(monthKey));
+      const filtered = all.filter(c => c.employee_id === currentEmployee.id && c.date.startsWith(monthKey));
+      
+      // הסר כפילויות - אם יש כמה אילוצים לאותו תאריך, קח רק את האחרון
+      const uniqueMap = new Map();
+      filtered.forEach(c => {
+        const existing = uniqueMap.get(c.date);
+        if (!existing || new Date(c.updated_date) > new Date(existing.updated_date)) {
+          uniqueMap.set(c.date, c);
+        }
+      });
+      
+      return Array.from(uniqueMap.values());
     },
     enabled: !!currentEmployee,
   });

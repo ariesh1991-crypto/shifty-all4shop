@@ -32,7 +32,19 @@ export default function AllConstraints() {
     queryKey: ['constraints', monthKey],
     queryFn: async () => {
       const all = await base44.entities.Constraint.list();
-      return all.filter(c => c.date && c.date.startsWith(monthKey));
+      const filtered = all.filter(c => c.date && c.date.startsWith(monthKey));
+      
+      // הסר כפילויות - אם יש כמה אילוצים לאותו עובד באותו תאריך, קח רק את האחרון
+      const uniqueMap = new Map();
+      filtered.forEach(c => {
+        const key = `${c.date}-${c.employee_id}`;
+        const existing = uniqueMap.get(key);
+        if (!existing || new Date(c.updated_date) > new Date(existing.updated_date)) {
+          uniqueMap.set(key, c);
+        }
+      });
+      
+      return Array.from(uniqueMap.values());
     },
   });
 

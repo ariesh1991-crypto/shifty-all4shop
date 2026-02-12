@@ -1,20 +1,21 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { format, getMonth, getYear } from 'date-fns';
+import { format, getMonth, getYear, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from 'date-fns';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ChevronLeft, ChevronRight, ArrowRight, Trash2, Filter } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ArrowRight, Trash2, Filter, List } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
+import MonthCalendar from '../components/shifts/MonthCalendar';
 
 export default function AllConstraints() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [filterEmployee, setFilterEmployee] = useState('all');
   const [filterType, setFilterType] = useState('all');
+  const [viewMode, setViewMode] = useState('calendar'); // 'calendar' או 'list'
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -33,6 +34,11 @@ export default function AllConstraints() {
       const all = await base44.entities.Constraint.list();
       return all.filter(c => c.date && c.date.startsWith(monthKey));
     },
+  });
+
+  const { data: recurringConstraints = [] } = useQuery({
+    queryKey: ['recurringConstraints'],
+    queryFn: () => base44.entities.RecurringConstraint.list(),
   });
 
   const deleteConstraintMutation = useMutation({
@@ -67,6 +73,86 @@ export default function AllConstraints() {
     return emp?.full_name || 'לא ידוע';
   };
 
+  const renderDay = (date) => {
+    const dayOfWeek = getDay(date);
+    if (dayOfWeek === 6) return null;
+
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const dayNumber = format(date, 'd');
+    
+    // מצא אילוצים ליום זה
+    const dayConstraints = allConstraints.filter(c => c.date === dateStr);
+    
+    // בדוק אילוצים חוזרים
+    const dayRecurringConstraints = recurringConstraints.filter(rc => rc.day_of_week === dayOfWeek);
+    
+    // סינון לפי עובד נבחר
+    const filteredDayConstraints = filterEmployee === 'all' 
+      ? dayConstraints 
+      : dayConstraints.filter(c => c.employee_id === filterEmployee);
+    
+    const filteredRecurringConstraints = filterEmployee === 'all'
+      ? dayRecurringConstraints
+      : dayRecurringConstraints.filter(rc => rc.employee_id === filterEmployee);
+
+    // סינון לפי סוג
+    const finalConstraints = filteredDayConstraints.filter(c => {
+      if (filterType === 'all') return true;
+      if (filterType === 'unavailable') return c.unavailable;
+      if (filterType === 'preference') return c.preference && !c.unavailable;
+      return true;
+    });
+
+    const totalItems = finalConstraints.length + filteredRecurringConstraints.length;
+    const hasUnavailable = finalConstraints.some(c => c.unavailable) || filteredRecurringConstraints.length > 0;
+
+    return (
+      <div
+        key={date.toString()}
+        className={`p-2 border-2 rounded-lg min-h-[100px] ${
+          hasUnavailable ? 'bg-red-50 border-red-300' : 
+          totalItems > 0 ? 'bg-blue-50 border-blue-300' : 
+          'bg-white border-gray-200'
+        }`}
+      >
+        <div className="font-bold text-center mb-2">{dayNumber}</div>
+        <div className="space-y-1">
+          {/* אילוצים חוזרים */}
+          {filteredRecurringConstraints.map(rc => {
+            const empName = getEmployeeName(rc.employee_id);
+            return (
+              <div key={`rc-${rc.id}`} className="text-[10px] p-1 rounded bg-orange-200 border border-orange-400">
+                <div className="font-bold text-orange-900">🔄 {empName}</div>
+                <div className="text-orange-700">אילוץ קבוע</div>
+                {rc.notes && <div className="text-[9px] mt-1">{rc.notes}</div>}
+              </div>
+            );
+          })}
+          
+          {/* אילוצים רגילים */}
+          {finalConstraints.map(c => {
+            const empName = getEmployeeName(c.employee_id);
+            return (
+              <div 
+                key={c.id} 
+                className={`text-[10px] p-1 rounded border ${
+                  c.unavailable 
+                    ? 'bg-red-200 border-red-400' 
+                    : 'bg-blue-200 border-blue-400'
+                }`}
+              >
+                <div className="font-bold">{empName}</div>
+                {c.unavailable && <div className="text-red-700">לא זמין</div>}
+                {c.preference && <div className="text-blue-700 text-[9px]">{c.preference}</div>}
+                {c.notes && <div className="text-gray-700 text-[9px] mt-1">{c.notes}</div>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-6" dir="rtl">
       <div className="max-w-7xl mx-auto">
@@ -90,7 +176,7 @@ export default function AllConstraints() {
 
         <div className="bg-white rounded-lg shadow-md p-4 mb-4">
           <div className="flex gap-4 items-center justify-between flex-wrap">
-            <div className="flex gap-4 items-center">
+            <div className="flex gap-4 items-center flex-wrap">
               <Filter className="w-5 h-5 text-gray-500" />
               <Select value={filterEmployee} onValueChange={setFilterEmployee}>
                 <SelectTrigger className="w-48">
@@ -113,6 +199,21 @@ export default function AllConstraints() {
                   <SelectItem value="preference">העדפות בלבד</SelectItem>
                 </SelectContent>
               </Select>
+              <Button 
+                variant={viewMode === 'calendar' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('calendar')}
+              >
+                📅 לוח
+              </Button>
+              <Button 
+                variant={viewMode === 'list' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('list')}
+              >
+                <List className="w-4 h-4 ml-2" />
+                רשימה
+              </Button>
             </div>
             <div className="flex gap-2">
               <Badge variant="outline" className="text-lg px-4 py-2">
@@ -132,70 +233,77 @@ export default function AllConstraints() {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          {filteredConstraints.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <p className="text-xl">אין אילוצים לחודש זה</p>
+        {viewMode === 'calendar' ? (
+          <div>
+            <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4 mb-4">
+              <h3 className="font-bold mb-2">מקרא:</h3>
+              <div className="flex gap-4 flex-wrap text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-red-200 border-2 border-red-400 rounded"></div>
+                  <span>לא זמין</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-blue-200 border-2 border-blue-400 rounded"></div>
+                  <span>העדפה</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-orange-200 border-2 border-orange-400 rounded"></div>
+                  <span>🔄 אילוץ קבוע (לימודים)</span>
+                </div>
+              </div>
             </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-right">תאריך</TableHead>
-                  <TableHead className="text-right">עובד</TableHead>
-                  <TableHead className="text-right">סטטוס</TableHead>
-                  <TableHead className="text-right">העדפה</TableHead>
-                  <TableHead className="text-right">הערות</TableHead>
-                  <TableHead className="text-right">פעולות</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <MonthCalendar year={year} month={month} renderDay={renderDay} />
+          </div>
+        ) : (
+          <div className="bg-white rounded-lg shadow-md overflow-hidden">
+            {filteredConstraints.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <p className="text-xl">אין אילוצים לחודש זה</p>
+              </div>
+            ) : (
+              <div className="divide-y">
                 {filteredConstraints.map((constraint) => (
-                  <TableRow key={constraint.id}>
-                    <TableCell className="font-medium">
-                      {format(new Date(constraint.date), 'dd/MM/yyyy')}
-                    </TableCell>
-                    <TableCell>{getEmployeeName(constraint.employee_id)}</TableCell>
-                    <TableCell>
-                      {constraint.unavailable ? (
-                        <Badge variant="destructive">לא זמין</Badge>
-                      ) : (
-                        <Badge variant="secondary">זמין</Badge>
+                  <div key={constraint.id} className="p-4 hover:bg-gray-50 flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="font-bold text-lg">
+                          {format(new Date(constraint.date), 'dd/MM/yyyy')}
+                        </div>
+                        <Badge variant="outline">{getEmployeeName(constraint.employee_id)}</Badge>
+                        {constraint.unavailable ? (
+                          <Badge variant="destructive">לא זמין</Badge>
+                        ) : (
+                          <Badge variant="secondary">זמין</Badge>
+                        )}
+                      </div>
+                      {constraint.preference && (
+                        <div className="text-sm text-blue-700 mb-1">
+                          <strong>העדפה:</strong> {constraint.preference}
+                        </div>
                       )}
-                    </TableCell>
-                    <TableCell>
-                      {constraint.preference ? (
-                        <span className="text-sm">{constraint.preference}</span>
-                      ) : (
-                        <span className="text-gray-400 text-sm">-</span>
+                      {constraint.notes && (
+                        <div className="text-sm text-gray-600">
+                          <strong>הערות:</strong> {constraint.notes}
+                        </div>
                       )}
-                    </TableCell>
-                    <TableCell>
-                      {constraint.notes ? (
-                        <span className="text-sm">{constraint.notes}</span>
-                      ) : (
-                        <span className="text-gray-400 text-sm">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          if (confirm('האם למחוק אילוץ זה?')) {
-                            deleteConstraintMutation.mutate(constraint.id);
-                          }
-                        }}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        if (confirm('האם למחוק אילוץ זה?')) {
+                          deleteConstraintMutation.mutate(constraint.id);
+                        }
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 ))}
-              </TableBody>
-            </Table>
-          )}
-        </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

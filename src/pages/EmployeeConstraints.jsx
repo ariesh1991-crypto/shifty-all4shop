@@ -142,7 +142,21 @@ export default function EmployeeConstraints() {
   });
 
   const createRecurringConstraintMutation = useMutation({
-    mutationFn: (data) => base44.entities.RecurringConstraint.create(data),
+    mutationFn: async (data) => {
+      // בדוק אם כבר קיים אילוץ חוזר לאותו עובד ואותו יום
+      const all = await base44.entities.RecurringConstraint.list();
+      const existing = all.find(rc => 
+        rc.employee_id === data.employee_id && 
+        rc.day_of_week === data.day_of_week
+      );
+      
+      if (existing) {
+        // אם קיים, עדכן במקום ליצור חדש
+        return base44.entities.RecurringConstraint.update(existing.id, data);
+      } else {
+        return base44.entities.RecurringConstraint.create(data);
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries(['recurringConstraints']);
       toast({ title: 'בקשת אילוץ קבוע נשלחה למנהל לאישור' });

@@ -1201,7 +1201,6 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
           unassignedShifts.push({ date: dateStr, type: shiftType });
         }
       }
-      }
 
       // צור משמרות ב-batches כדי לא לעבור rate limit
       const createBatchSize = 5;

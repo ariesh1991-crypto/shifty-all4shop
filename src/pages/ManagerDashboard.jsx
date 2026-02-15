@@ -1013,12 +1013,107 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
       }
 
       // עכשיו צור משמרות רגילות (לא שישי)
+      // שלב 1: משמרות ארוכות (19:00) - בעדיפות ראשונה!
       for (const day of days) {
         const dayOfWeek = getDay(day);
-        if (dayOfWeek === 6 || dayOfWeek === 5) continue; // דלג על שבת ושישי (כבר טיפלנו)
+        if (dayOfWeek === 6 || dayOfWeek === 5) continue;
 
         const dateStr = format(day, 'yyyy-MM-dd');
-        const shiftTypes = ['מסיים ב-17:30', 'מסיים ב-19:00'];
+        const shiftType = 'מסיים ב-19:00';
+        const preferredType = 'מעדיף מסיים ב-19:00';
+        
+        let empId = selectEmployeeForShift(day, shiftType, preferredType);
+
+        if (empId) {
+          const employee = activeEmployees.find(e => e.id === empId);
+          const times = calculateShiftTimes(shiftType, employee.contract_type);
+          
+          // בדוק חריגות
+          const constraint = constraints.find(c => c.employee_id === empId && c.date === dateStr);
+          if (constraint && constraint.unavailable) {
+            alerts.push({
+              type: 'error',
+              employeeId: empId,
+              employeeName: employee.full_name,
+              date: dateStr,
+              shiftType: shiftType,
+              message: `${employee.full_name} שובץ למשמרת ${shiftType} ב-${dateStr} למרות שסומן כלא זמין`,
+              reason: constraint.notes || 'לא זמין'
+            });
+          }
+
+          const dayOfWeek = getDay(new Date(dateStr));
+          const recurringConstraint = recurringConstraints.find(
+            rc => rc.employee_id === empId && rc.day_of_week === dayOfWeek && rc.unavailable && rc.status === 'אושר'
+          );
+          if (recurringConstraint) {
+            alerts.push({
+              type: 'error',
+              employeeId: empId,
+              employeeName: employee.full_name,
+              date: dateStr,
+              shiftType: shiftType,
+              message: `${employee.full_name} שובץ למשמרת ${shiftType} ב-${dateStr} למרות אילוץ קבוע`,
+              reason: recurringConstraint.notes || 'אילוץ קבוע (לימודים/התחייבות)'
+            });
+          }
+
+          const vacation = vacationRequests.find(v => 
+            v.employee_id === empId && 
+            v.status === 'אושר' &&
+            dateStr >= v.start_date && 
+            dateStr <= v.end_date
+          );
+          if (vacation) {
+            alerts.push({
+              type: 'error',
+              employeeId: empId,
+              employeeName: employee.full_name,
+              date: dateStr,
+              shiftType: shiftType,
+              message: `${employee.full_name} שובץ למשמרת ${shiftType} ב-${dateStr} למרות שיש לו ${vacation.type} מאושרת`,
+              reason: `${vacation.type} מאושרת`
+            });
+          }
+          
+          newShifts.push({
+            date: dateStr,
+            shift_type: shiftType,
+            assigned_employee_id: empId,
+            start_time: times.start,
+            end_time: times.end,
+            status: 'תקין',
+            schedule_status: 'טיוטה',
+          });
+
+          assignShift(empId, day, shiftType);
+        } else {
+          const unassignmentDetails = activeEmployees.map(emp => ({
+            employee_id: emp.id,
+            employee_name: emp.full_name,
+            reasons: getEmployeeUnavailabilityReasons(emp.id, day, shiftType)
+          })).filter(detail => detail.reasons.length > 0);
+
+          newShifts.push({
+            date: dateStr,
+            shift_type: shiftType,
+            status: 'בעיה',
+            schedule_status: 'טיוטה',
+            exception_reason: 'אין עובד זמין - כל העובדים הגיעו למגבלה השבועית/חודשית או לא זמינים',
+            unassignment_details: unassignmentDetails,
+          });
+          unassignedShifts.push({ date: dateStr, type: shiftType });
+        }
+      }
+
+      // שלב 2: משמרות קצרות (17:30) - רק אחרי שכל הארוכות שובצו
+      for (const day of days) {
+        const dayOfWeek = getDay(day);
+        if (dayOfWeek === 6 || dayOfWeek === 5) continue;
+
+        const dateStr = format(day, 'yyyy-MM-dd');
+        const shiftType = 'מסיים ב-17:30';
+        const preferredType = 'מעדיף מסיים ב-17:30';
 
         for (const shiftType of shiftTypes) {
           const preferredType = shiftType === 'מסיים ב-17:30' ? 'מעדיף מסיים ב-17:30' : 

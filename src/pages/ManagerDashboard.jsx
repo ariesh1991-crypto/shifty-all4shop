@@ -5,6 +5,7 @@ import { format, getMonth, getYear, getDay, startOfMonth, endOfMonth, eachDayOfI
 import { ChevronLeft, ChevronRight, Sparkles, Users, LogOut, AlertCircle, ArrowLeftRight, Plus, Filter, Briefcase, Home, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import NotificationBell from '../components/notifications/NotificationBell';
+import RealTimeAlertsPanel from '../components/notifications/RealTimeAlertsPanel';
 import VacationManager from '../components/vacations/VacationManager';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -1204,6 +1205,7 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
           
           <div className="flex gap-3 flex-wrap">
             {currentUser && <NotificationBell userId={currentUser.id} />}
+            <RealTimeAlertsPanel isManager={true} />
             <Link to={createPageUrl('ManagerDashboardHome')}>
               <Button variant="outline">
                 <Home className="w-4 h-4 ml-2" />

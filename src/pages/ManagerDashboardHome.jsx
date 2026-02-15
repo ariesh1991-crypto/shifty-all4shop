@@ -95,6 +95,11 @@ export default function ManagerDashboardHome() {
                 📊 דוח עובדים
               </Button>
             </Link>
+            <Link to={createPageUrl('AdvancedPlanningTools')}>
+              <Button variant="outline">
+                🔮 כלי תכנון מתקדמים
+              </Button>
+            </Link>
             <Button onClick={() => base44.auth.logout()} variant="outline">
               <LogOut className="w-4 h-4 ml-2" />
               יציאה

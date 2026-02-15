@@ -775,10 +775,13 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
         if (shiftType === 'מסיים ב-17:30' && employee.morning_preferred_days?.includes(dayOfWeek)) score += 10;
         if (shiftType === 'מסיים ב-19:00' && employee.evening_preferred_days?.includes(dayOfWeek)) score += 10;
 
-        // העדפות שישי
-        if (shiftType === 'שישי ארוך' && employee.friday_preference === 'long') score += 25;
-        if (shiftType === 'שישי קצר' && employee.friday_preference === 'short') score += 25;
+        // העדפות שישי - תן משקל גבוה מאוד!
+        if (shiftType === 'שישי ארוך' && employee.friday_preference === 'long') score += 100;
+        if (shiftType === 'שישי קצר' && employee.friday_preference === 'short') score += 100;
         if (shiftType.includes('שישי') && employee.friday_preference === 'avoid') score -= 50;
+        
+        // בדוק גם העדפות ספציפיות
+        if (employee.preferred_shift_times?.includes(shiftType)) score += 150;
 
         // הוגנות - העדיף עובדים עם פחות משמרות
         score -= stats.totalShifts * 3;

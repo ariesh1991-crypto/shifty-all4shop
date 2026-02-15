@@ -263,6 +263,8 @@ export default function EmployeeConstraints() {
           constraint?.unavailable ? 'bg-red-100 border-red-400' :
           constraint?.preference === 'מעדיף לסיים ב-17:30' ? 'bg-blue-100 border-blue-400' :
           constraint?.preference === 'מעדיף לסיים ב-19:00' ? 'bg-purple-100 border-purple-400' :
+          constraint?.preference === 'שישי קצר' ? 'bg-yellow-100 border-yellow-400' :
+          constraint?.preference === 'שישי ארוך' ? 'bg-orange-100 border-orange-400' :
           'bg-white'
         }`}
       >
@@ -509,6 +511,14 @@ export default function EmployeeConstraints() {
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 rounded bg-purple-100 border-2 border-purple-400"></div>
                   <span className="text-sm">מעדיף לסיים ב-19:00</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded bg-yellow-100 border-2 border-yellow-400"></div>
+                  <span className="text-sm">מעדיף שישי קצר</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded bg-orange-100 border-2 border-orange-400"></div>
+                  <span className="text-sm">מעדיף שישי ארוך</span>
                 </div>
               </div>
             </div>

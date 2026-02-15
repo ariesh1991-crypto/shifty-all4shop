@@ -1115,11 +1115,8 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
         const shiftType = 'מסיים ב-17:30';
         const preferredType = 'מעדיף מסיים ב-17:30';
 
-        for (const shiftType of shiftTypes) {
-          const preferredType = shiftType === 'מסיים ב-17:30' ? 'מעדיף מסיים ב-17:30' : 
-                                shiftType === 'מסיים ב-19:00' ? 'מעדיף מסיים ב-19:00' : null;
-          
-          let empId = selectEmployeeForShift(day, shiftType, preferredType);
+        
+        let empId = selectEmployeeForShift(day, shiftType, preferredType);
 
           if (empId) {
             const employee = activeEmployees.find(e => e.id === empId);

@@ -24,11 +24,23 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const SHIFT_COLORS = {
-  'מסיים ב-17:30': 'bg-blue-200',
-  'מסיים ב-19:00': 'bg-purple-200',
-  'שישי קצר': 'bg-yellow-200',
-  'שישי ארוך': 'bg-orange-200',
+// צבעים לפי עובד
+const EMPLOYEE_COLORS = [
+  'bg-blue-200',
+  'bg-purple-200', 
+  'bg-pink-200',
+  'bg-green-200',
+  'bg-yellow-200',
+  'bg-orange-200',
+  'bg-cyan-200',
+  'bg-indigo-200',
+  'bg-red-200',
+  'bg-teal-200',
+];
+
+const getEmployeeColor = (employeeId, employees) => {
+  const index = employees.findIndex(e => e.id === employeeId);
+  return EMPLOYEE_COLORS[index % EMPLOYEE_COLORS.length];
 };
 
 const STATUS_COLORS = {
@@ -786,21 +798,29 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
           return null;
         }
 
-        // במשמרות שישי - תן עדיפות מוחלטת למי שלא עשה שישי כלל
+        // במשמרות שישי - תן עדיפות למי שלא עשה שישי כלל, אבל עדיף עם העדפה
         if (isFridayShift) {
           const noFridayCandidates = candidates.filter(emp => employeeStats[emp.id].fridayCount === 0);
           
           if (noFridayCandidates.length > 0) {
-            // בדוק העדפות לשישי
-            const withPreference = noFridayCandidates.filter(emp => 
+            // חשוב מאוד - תן עדיפות גבוהה למי שמעדיף את הסוג הספציפי
+            const withStrongPreference = noFridayCandidates.filter(emp => 
               emp.preferred_shift_times && emp.preferred_shift_times.includes(shiftType)
             );
             
-            const finalCandidates = withPreference.length > 0 ? withPreference : noFridayCandidates;
+            // אם יש מישהו שמעדיף - קח רק אותו
+            const finalCandidates = withStrongPreference.length > 0 ? withStrongPreference : noFridayCandidates;
             
             // מיון לפי ציון (שמשלב העדפות והוגנות)
             finalCandidates.sort((a, b) => {
-              return calculateEmployeeScore(b.id, date, shiftType) - calculateEmployeeScore(a.id, date, shiftType);
+              const scoreA = calculateEmployeeScore(a.id, date, shiftType);
+              const scoreB = calculateEmployeeScore(b.id, date, shiftType);
+              
+              // אם יש העדפה ל-shiftType הספציפי - תן בונוס ענק
+              const prefA = a.preferred_shift_times?.includes(shiftType) ? 1000 : 0;
+              const prefB = b.preferred_shift_times?.includes(shiftType) ? 1000 : 0;
+              
+              return (scoreB + prefB) - (scoreA + prefA);
             });
             
             const selected = finalCandidates[0];
@@ -808,22 +828,32 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
             return selected.id;
           }
           
-          // אם כולם כבר עשו שישי, קח את מי שעשה הכי פחות
-          candidates.sort((a, b) => {
+          // אם כולם כבר עשו שישי, תן עדיפות חזקה למי שמעדיף את הסוג הזה
+          const withStrongPreference = candidates.filter(emp => 
+            emp.preferred_shift_times && emp.preferred_shift_times.includes(shiftType)
+          );
+          
+          const sortCandidates = withStrongPreference.length > 0 ? withStrongPreference : candidates;
+          
+          sortCandidates.sort((a, b) => {
             const aStats = employeeStats[a.id];
             const bStats = employeeStats[b.id];
+            
+            // תן משקל גבוה להעדפה
+            const aPreferred = a.preferred_shift_times?.includes(shiftType) ? 1000 : 0;
+            const bPreferred = b.preferred_shift_times?.includes(shiftType) ? 1000 : 0;
+            
             if (aStats.fridayCount !== bStats.fridayCount) {
               return aStats.fridayCount - bStats.fridayCount;
             }
-            // בדוק העדפה
-            const aPreferred = a.preferred_shift_times && a.preferred_shift_times.includes(shiftType);
-            const bPreferred = b.preferred_shift_times && b.preferred_shift_times.includes(shiftType);
-            if (aPreferred !== bPreferred) return bPreferred ? 1 : -1;
+            
+            // העדפה תכריע
+            if (aPreferred !== bPreferred) return bPreferred - aPreferred;
             
             return aStats.totalShifts - bStats.totalShifts;
           });
           
-          const selected = candidates[0];
+          const selected = sortCandidates[0];
           console.log(`✅ נבחר ${selected.full_name} ל-${shiftType} ב-${dateStr} (${employeeStats[selected.id].fridayCount} שישי, ${employeeStats[selected.id].totalShifts} משמרות)`);
           return selected.id;
         }
@@ -1279,10 +1309,12 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
             
             const hasConflict = (constraint?.unavailable) || vacation || recurringForShift;
 
+            const employeeColor = shift.assigned_employee_id ? getEmployeeColor(shift.assigned_employee_id, employees) : 'bg-gray-200';
+            
             return (
               <div
                 key={shift.id}
-                className={`text-xs p-1 rounded border-2 ${SHIFT_COLORS[shift.shift_type]} ${STATUS_COLORS[shift.status]} ${hasConflict ? 'ring-2 ring-red-500 ring-offset-1' : ''}`}
+                className={`text-xs p-1 rounded border-2 ${employeeColor} ${STATUS_COLORS[shift.status]} ${hasConflict ? 'ring-2 ring-red-500 ring-offset-1' : ''}`}
               >
                 <div className="font-medium flex items-center gap-1">
                   {hasConflict && <AlertCircle className="w-3 h-3 text-red-600" />}
@@ -1497,9 +1529,11 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
             renderItem={(shift, idx) => {
               const employee = employees.find(e => e.id === shift.assigned_employee_id);
               const hasConflict = constraints.find(c => c.employee_id === shift.assigned_employee_id && c.date === shift.date && c.unavailable);
+              const employeeColor = shift.assigned_employee_id ? getEmployeeColor(shift.assigned_employee_id, employees) : 'bg-gray-200';
+              
               return (
                 <div key={idx} className={`p-2 rounded-lg text-sm border-2 ${
-                  SHIFT_COLORS[shift.shift_type]
+                  employeeColor
                 } ${STATUS_COLORS[shift.status]} ${
                   hasConflict ? 'ring-2 ring-red-500' : ''
                 }`}>

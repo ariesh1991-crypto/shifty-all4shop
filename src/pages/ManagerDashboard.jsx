@@ -17,6 +17,7 @@ import CalendarViewToggle from '../components/shifts/CalendarViewToggle';
 import WeekCalendar from '../components/shifts/WeekCalendar';
 import AgendaView from '../components/shifts/AgendaView';
 import UnassignedShiftDetailsDialog from '../components/shifts/UnassignedShiftDetailsDialog';
+import PrintSchedule from '../components/shifts/PrintSchedule';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
@@ -1395,7 +1396,7 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-6" dir="rtl">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-6 no-print" dir="rtl">
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
           <h1 className="text-3xl font-bold">לוח משמרות</h1>
@@ -1682,6 +1683,13 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
           shift={unassignedShiftDetails}
           open={unassignedShiftDialogOpen}
           onOpenChange={setUnassignedShiftDialogOpen}
+        />
+
+        <PrintSchedule 
+          year={year}
+          month={month}
+          shifts={allShifts}
+          employees={employees}
         />
       </div>
     </div>

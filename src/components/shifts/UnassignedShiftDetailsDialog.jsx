@@ -33,6 +33,7 @@ export default function UnassignedShiftDetailsDialog({ shift, open, onOpenChange
     'כבר עם 2 משמרות שישי': '📊',
     'כבר עשה שישי מסוג זה': '🔁',
     'כבר עם משמרת זהה השבוע': '📈',
+    'עשה ארוכה בחמישי': '🌙',
   };
 
   return (

@@ -16,6 +16,7 @@ import MonthCalendar from '../components/shifts/MonthCalendar';
 import CalendarViewToggle from '../components/shifts/CalendarViewToggle';
 import WeekCalendar from '../components/shifts/WeekCalendar';
 import AgendaView from '../components/shifts/AgendaView';
+import UnassignedShiftDetailsDialog from '../components/shifts/UnassignedShiftDetailsDialog';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
@@ -84,6 +85,8 @@ export default function ManagerDashboard() {
   const [calendarView, setCalendarView] = useState('month');
   const [aiSuggestions, setAiSuggestions] = useState(null);
   const [aiSuggestionsDialogOpen, setAiSuggestionsDialogOpen] = useState(false);
+  const [unassignedShiftDetails, setUnassignedShiftDetails] = useState(null);
+  const [unassignedShiftDialogOpen, setUnassignedShiftDialogOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -651,6 +654,88 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
         }
       };
 
+      // פונקציה לאסוף סיבות למה עובד לא יכול לקבל משמרת
+      const getEmployeeUnavailabilityReasons = (empId, date, shiftType) => {
+        const stats = employeeStats[empId];
+        const employee = stats.employee;
+        const weekNum = getWeekNum(date);
+        const dateStr = format(date, 'yyyy-MM-dd');
+        const dayOfWeek = getDay(date);
+        const isFridayShift = shiftType.includes('שישי');
+        const reasons = [];
+
+        // בדוק אם כבר משובץ
+        if (stats.assignedDates.has(dateStr)) {
+          reasons.push('כבר משובץ');
+        }
+
+        // בדוק אילוץ ספציפי
+        const constraint = constraints.find(c => c.employee_id === empId && c.date === dateStr);
+        if (constraint?.unavailable) {
+          reasons.push('לא זמין');
+        }
+
+        // בדוק אילוץ חוזר
+        const recurringConstraint = recurringConstraints.find(
+          rc => rc.employee_id === empId && rc.day_of_week === dayOfWeek && rc.unavailable && rc.status === 'אושר'
+        );
+        if (recurringConstraint) {
+          reasons.push('אילוץ קבוע');
+        }
+
+        // בדוק חופשה
+        const vacation = vacationRequests.find(v => 
+          v.employee_id === empId && 
+          v.status === 'אושר' &&
+          dateStr >= v.start_date && 
+          dateStr <= v.end_date
+        );
+        if (vacation) {
+          reasons.push('בחופשה');
+        }
+
+        // בדוק משמרת חסומה
+        if (employee.blocked_shift_times && employee.blocked_shift_times.includes(shiftType)) {
+          reasons.push('משמרת חסומה');
+        }
+
+        // בדוק יום חסום
+        if (employee.blocked_days?.includes(dayOfWeek)) {
+          reasons.push('יום חסום');
+        }
+
+        // בדוק מגבלת שבוע
+        const weekShifts = stats.weeklyShifts[weekNum] || 0;
+        if (weekShifts >= 2) {
+          reasons.push('חורג ממגבלת שבוע');
+        }
+
+        // בדוק מגבלת שישי
+        if (isFridayShift && stats.fridayCount >= 2) {
+          reasons.push('כבר עם 2 משמרות שישי');
+        }
+
+        // בדוק חוק שישי - שני מאותו סוג
+        if (isFridayShift && stats.fridayCount === 1) {
+          if (shiftType === 'שישי ארוך' && stats.fridayLongCount > 0) {
+            reasons.push('כבר עשה שישי מסוג זה');
+          }
+          if (shiftType === 'שישי קצר' && stats.fridayShortCount > 0) {
+            reasons.push('כבר עשה שישי מסוג זה');
+          }
+        }
+
+        // בדוק חוק משמרת שנייה בשבוע
+        if (!isFridayShift && weekShifts === 1) {
+          const weekTypes = stats.weeklyShiftTypes[weekNum] || [];
+          if (weekTypes.includes(shiftType)) {
+            reasons.push('כבר עם משמרת זהה השבוע');
+          }
+        }
+
+        return reasons;
+      };
+
       // פונקציה לבחור עובד למשמרת (בחירה הוגנת + כיבוד העדפות)
       // פונקציית עזר לחישוב ציון עובד למשמרת (ככל שגבוה יותר - יותר טוב)
       const calculateEmployeeScore = (empId, date, shiftType) => {
@@ -819,12 +904,20 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
 
             assignShift(empId, day, shiftType);
           } else {
+            // לא נמצא עובד זמין - אסוף סיבות מכל העובדים
+            const unassignmentDetails = activeEmployees.map(emp => ({
+              employee_id: emp.id,
+              employee_name: emp.full_name,
+              reasons: getEmployeeUnavailabilityReasons(emp.id, day, shiftType)
+            })).filter(detail => detail.reasons.length > 0);
+
             newShifts.push({
               date: dateStr,
               shift_type: shiftType,
               status: 'בעיה',
               schedule_status: 'טיוטה',
               exception_reason: 'אין עובד זמין למשמרת שישי',
+              unassignment_details: unassignmentDetails,
             });
             unassignedShifts.push({ date: dateStr, type: shiftType });
           }
@@ -911,13 +1004,20 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
 
             assignShift(empId, day, shiftType);
           } else {
-            // לא נמצא עובד זמין
+            // לא נמצא עובד זמין - אסוף סיבות מכל העובדים
+            const unassignmentDetails = activeEmployees.map(emp => ({
+              employee_id: emp.id,
+              employee_name: emp.full_name,
+              reasons: getEmployeeUnavailabilityReasons(emp.id, day, shiftType)
+            })).filter(detail => detail.reasons.length > 0);
+
             newShifts.push({
               date: dateStr,
               shift_type: shiftType,
               status: 'בעיה',
               schedule_status: 'טיוטה',
               exception_reason: 'אין עובד זמין - כל העובדים הגיעו למגבלה השבועית/חודשית או לא זמינים',
+              unassignment_details: unassignmentDetails,
             });
             unassignedShifts.push({ date: dateStr, type: shiftType });
           }
@@ -1138,13 +1238,21 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
 
             if (shift.status === 'בעיה') {
               return (
-                <div key={shift.id} className="text-xs p-1 rounded border-2 border-red-500 bg-red-100">
+                <div 
+                  key={shift.id} 
+                  className="text-xs p-1 rounded border-2 border-red-500 bg-red-100 cursor-pointer hover:bg-red-200 transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setUnassignedShiftDetails(shift);
+                    setUnassignedShiftDialogOpen(true);
+                  }}
+                >
                   <div className="font-medium flex items-center gap-1">
                     <AlertCircle className="w-3 h-3 text-red-600" />
                     <span className="text-red-700">לא משובץ</span>
                   </div>
                   <div className="text-red-600 text-[10px]">{shift.shift_type}</div>
-                  {shift.exception_reason && <div className="text-[9px] text-red-500 mt-1">{shift.exception_reason}</div>}
+                  <div className="text-[9px] text-red-500 mt-1 underline">לחץ לפרטים</div>
                 </div>
               );
             }
@@ -1471,6 +1579,12 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
             {aiSuggestions && <AISuggestionsView suggestions={aiSuggestions} />}
           </DialogContent>
         </Dialog>
+
+        <UnassignedShiftDetailsDialog
+          shift={unassignedShiftDetails}
+          open={unassignedShiftDialogOpen}
+          onOpenChange={setUnassignedShiftDialogOpen}
+        />
       </div>
     </div>
   );

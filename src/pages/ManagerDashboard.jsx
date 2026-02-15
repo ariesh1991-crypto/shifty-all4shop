@@ -1115,10 +1115,9 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
         const shiftType = 'מסיים ב-17:30';
         const preferredType = 'מעדיף מסיים ב-17:30';
 
-        
         let empId = selectEmployeeForShift(day, shiftType, preferredType);
 
-          if (empId) {
+        if (empId) {
             const employee = activeEmployees.find(e => e.id === empId);
             const times = calculateShiftTimes(shiftType, employee.contract_type);
             

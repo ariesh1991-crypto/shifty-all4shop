@@ -10,6 +10,7 @@ import { createPageUrl } from '../utils';
 import WhatIfSimulator from '../components/manager/WhatIfSimulator';
 import TeamAvailabilityVisualizer from '../components/manager/TeamAvailabilityVisualizer';
 import RealTimeAlertsPanel from '../components/notifications/RealTimeAlertsPanel';
+import EmployeePerformanceAnalytics from '../components/analytics/EmployeePerformanceAnalytics';
 
 export default function AdvancedPlanningTools() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -67,7 +68,7 @@ export default function AdvancedPlanningTools() {
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="simulator">סימולטור What-If</TabsTrigger>
             <TabsTrigger value="visualizer">מפת זמינות צוות</TabsTrigger>
-            <TabsTrigger value="ai-suggestions">הצעות AI אוטומטיות</TabsTrigger>
+            <TabsTrigger value="ai-suggestions">ניתוח ביצועים AI</TabsTrigger>
           </TabsList>
 
           <TabsContent value="simulator">
@@ -91,12 +92,7 @@ export default function AdvancedPlanningTools() {
           </TabsContent>
 
           <TabsContent value="ai-suggestions">
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-xl font-bold mb-4">הצעות AI אוטומטיות לשיבוץ</h3>
-              <p className="text-gray-600">
-                תכונה זו מציגה המלצות חכמות לשיבוץ משמרות בזמן אמת
-              </p>
-            </div>
+            <EmployeePerformanceAnalytics currentMonth={currentDate} />
           </TabsContent>
         </Tabs>
       </div>

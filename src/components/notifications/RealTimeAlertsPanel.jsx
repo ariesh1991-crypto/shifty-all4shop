@@ -275,7 +275,10 @@ export default function RealTimeAlertsPanel({ isManager = false }) {
         )}
       </Button>
 
-      <Dialog open={alertsOpen} onOpenChange={setAlertsOpen}>
+      <Dialog open={alertsOpen} onOpenChange={(isOpen) => {
+        console.log('Dialog onOpenChange called:', isOpen);
+        setAlertsOpen(isOpen);
+      }}>
         <DialogContent dir="rtl" className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -307,7 +310,10 @@ export default function RealTimeAlertsPanel({ isManager = false }) {
       </Dialog>
 
       {selectedAlert && (
-        <Dialog open={!!selectedAlert} onOpenChange={() => setSelectedAlert(null)}>
+        <Dialog open={!!selectedAlert} onOpenChange={(isOpen) => {
+          console.log('Action Dialog onOpenChange called:', isOpen);
+          if (!isOpen) setSelectedAlert(null);
+        }}>
           <DialogContent dir="rtl">
             <DialogHeader>
               <DialogTitle>טיפול בהתראה</DialogTitle>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { format, getMonth, getYear, getDay, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, parseISO } from 'date-fns';
+import { format, getMonth, getYear, getDay, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, parseISO, addDays } from 'date-fns';
 import { ChevronLeft, ChevronRight, Sparkles, Users, LogOut, AlertCircle, ArrowLeftRight, Plus, Filter, Briefcase, Home } from 'lucide-react';
 import NotificationBell from '../components/notifications/NotificationBell';
 import VacationManager from '../components/vacations/VacationManager';
@@ -627,6 +627,36 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
       };
 
       // פונקציה לבחור עובד למשמרת (בחירה הוגנת + כיבוד העדפות)
+      // פונקציית עזר לחישוב ציון עובד למשמרת (ככל שגבוה יותר - יותר טוב)
+      const calculateEmployeeScore = (empId, date, shiftType) => {
+        const stats = employeeStats[empId];
+        const employee = stats.employee;
+        const dayOfWeek = getDay(date);
+        let score = 100;
+
+        // העדפות ימים
+        if (employee.preferred_days?.includes(dayOfWeek)) score += 20;
+        if (employee.blocked_days?.includes(dayOfWeek)) score -= 30;
+
+        // העדפות סוג משמרת
+        if (employee.preferred_shift_times?.includes(shiftType)) score += 15;
+        if (employee.blocked_shift_times?.includes(shiftType)) score -= 40;
+
+        // העדפות בוקר/ערב לפי יום
+        if (shiftType === 'מסיים ב-17:30' && employee.morning_preferred_days?.includes(dayOfWeek)) score += 10;
+        if (shiftType === 'מסיים ב-19:00' && employee.evening_preferred_days?.includes(dayOfWeek)) score += 10;
+
+        // העדפות שישי
+        if (shiftType === 'שישי ארוך' && employee.friday_preference === 'long') score += 25;
+        if (shiftType === 'שישי קצר' && employee.friday_preference === 'short') score += 25;
+        if (shiftType.includes('שישי') && employee.friday_preference === 'avoid') score -= 50;
+
+        // הוגנות - העדיף עובדים עם פחות משמרות
+        score -= stats.totalShifts * 3;
+
+        return score;
+      };
+
       const selectEmployeeForShift = (date, shiftType, preferredType = null) => {
         const isFridayShift = shiftType.includes('שישי');
         const dateStr = format(date, 'yyyy-MM-dd');
@@ -651,9 +681,9 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
             
             const finalCandidates = withPreference.length > 0 ? withPreference : noFridayCandidates;
             
-            // מיון לפי מספר משמרות כולל
+            // מיון לפי ציון (שמשלב העדפות והוגנות)
             finalCandidates.sort((a, b) => {
-              return employeeStats[a.id].totalShifts - employeeStats[b.id].totalShifts;
+              return calculateEmployeeScore(b.id, date, shiftType) - calculateEmployeeScore(a.id, date, shiftType);
             });
             
             const selected = finalCandidates[0];
@@ -707,13 +737,14 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
         
         const finalCandidates = withGeneralPreference.length > 0 ? withGeneralPreference : candidates;
         
-        // מיון לפי מספר משמרות כולל
+        // מיון לפי ציון (שמשלב העדפות והוגנות)
         finalCandidates.sort((a, b) => {
-          return employeeStats[a.id].totalShifts - employeeStats[b.id].totalShifts;
+          return calculateEmployeeScore(b.id, date, shiftType) - calculateEmployeeScore(a.id, date, shiftType);
         });
 
         const selected = finalCandidates[0];
-        console.log(`✅ נבחר ${selected.full_name} ל-${shiftType} ב-${dateStr} (${employeeStats[selected.id].totalShifts} משמרות)`);
+        const score = calculateEmployeeScore(selected.id, date, shiftType);
+        console.log(`✅ נבחר ${selected.full_name} ל-${shiftType} ב-${dateStr} (ציון: ${score}, ${employeeStats[selected.id].totalShifts} משמרות)`);
         return selected.id;
       };
 

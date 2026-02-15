@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Pencil, Trash2, ArrowRight, UserPlus, Search, CheckCircle2 } from 'lucide-react';
+import { Pencil, Trash2, ArrowRight, UserPlus, Search, CheckCircle2, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { useToast } from '@/components/ui/use-toast';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
@@ -179,6 +180,29 @@ export default function ManageEmployees() {
     return allShifts.filter(s => s.assigned_employee_id === employeeId).length;
   };
 
+  const exportToExcel = () => {
+    const data = filteredEmployees.map(emp => {
+      const linkedUser = users.find(u => u.id === emp.user_id);
+      const shiftCount = getEmployeeShiftCount(emp.id);
+      return {
+        'שם עובד': emp.full_name,
+        'סטטוס': emp.active ? 'פעיל' : 'לא פעיל',
+        'משמרות החודש': shiftCount,
+        'אימייל משתמש': linkedUser?.email || 'לא מחובר',
+        'סוג חוזה': emp.contract_type,
+        'הערות': emp.notes || '',
+        'משמרות מועדפות': emp.preferred_shift_times?.join(', ') || '',
+        'משמרות חסומות': emp.blocked_shift_times?.join(', ') || '',
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'עובדים');
+    XLSX.writeFile(wb, `עובדים_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+    toast({ title: 'הקובץ יוצא בהצלחה' });
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-6" dir="rtl">
       <div className="max-w-7xl mx-auto">
@@ -292,6 +316,10 @@ export default function ManageEmployees() {
               </Select>
             </div>
             <div className="flex gap-2">
+              <Button onClick={exportToExcel} variant="outline" size="lg">
+                <Download className="w-4 h-4 ml-2" />
+                ייצא לאקסל
+              </Button>
               <Button onClick={() => setInviteDialogOpen(true)} variant="outline" size="lg">
                 📧 הזמן עובד חדש
               </Button>

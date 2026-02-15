@@ -1118,89 +1118,89 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
         let empId = selectEmployeeForShift(day, shiftType, preferredType);
 
         if (empId) {
-            const employee = activeEmployees.find(e => e.id === empId);
-            const times = calculateShiftTimes(shiftType, employee.contract_type);
-            
-            // בדוק חריגות - אילוץ ספציפי
-            const constraint = constraints.find(c => c.employee_id === empId && c.date === dateStr);
-            if (constraint && constraint.unavailable) {
-              alerts.push({
-                type: 'error',
-                employeeId: empId,
-                employeeName: employee.full_name,
-                date: dateStr,
-                shiftType: shiftType,
-                message: `${employee.full_name} שובץ למשמרת ${shiftType} ב-${dateStr} למרות שסומן כלא זמין`,
-                reason: constraint.notes || 'לא זמין'
-              });
-            }
-
-            // בדוק אילוץ חוזר (רק מאושרים)
-            const dayOfWeek = getDay(new Date(dateStr));
-            const recurringConstraint = recurringConstraints.find(
-              rc => rc.employee_id === empId && rc.day_of_week === dayOfWeek && rc.unavailable && rc.status === 'אושר'
-            );
-            if (recurringConstraint) {
-              alerts.push({
-                type: 'error',
-                employeeId: empId,
-                employeeName: employee.full_name,
-                date: dateStr,
-                shiftType: shiftType,
-                message: `${employee.full_name} שובץ למשמרת ${shiftType} ב-${dateStr} למרות אילוץ קבוע`,
-                reason: recurringConstraint.notes || 'אילוץ קבוע (לימודים/התחייבות)'
-              });
-            }
-
-            // בדוק חופשות מאושרות
-            const vacation = vacationRequests.find(v => 
-              v.employee_id === empId && 
-              v.status === 'אושר' &&
-              dateStr >= v.start_date && 
-              dateStr <= v.end_date
-            );
-            if (vacation) {
-              alerts.push({
-                type: 'error',
-                employeeId: empId,
-                employeeName: employee.full_name,
-                date: dateStr,
-                shiftType: shiftType,
-                message: `${employee.full_name} שובץ למשמרת ${shiftType} ב-${dateStr} למרות שיש לו ${vacation.type} מאושרת`,
-                reason: `${vacation.type} מאושרת`
-              });
-            }
-            
-            newShifts.push({
+          const employee = activeEmployees.find(e => e.id === empId);
+          const times = calculateShiftTimes(shiftType, employee.contract_type);
+          
+          // בדוק חריגות - אילוץ ספציפי
+          const constraint = constraints.find(c => c.employee_id === empId && c.date === dateStr);
+          if (constraint && constraint.unavailable) {
+            alerts.push({
+              type: 'error',
+              employeeId: empId,
+              employeeName: employee.full_name,
               date: dateStr,
-              shift_type: shiftType,
-              assigned_employee_id: empId,
-              start_time: times.start,
-              end_time: times.end,
-              status: 'תקין',
-              schedule_status: 'טיוטה',
+              shiftType: shiftType,
+              message: `${employee.full_name} שובץ למשמרת ${shiftType} ב-${dateStr} למרות שסומן כלא זמין`,
+              reason: constraint.notes || 'לא זמין'
             });
-
-            assignShift(empId, day, shiftType);
-          } else {
-            // לא נמצא עובד זמין - אסוף סיבות מכל העובדים
-            const unassignmentDetails = activeEmployees.map(emp => ({
-              employee_id: emp.id,
-              employee_name: emp.full_name,
-              reasons: getEmployeeUnavailabilityReasons(emp.id, day, shiftType)
-            })).filter(detail => detail.reasons.length > 0);
-
-            newShifts.push({
-              date: dateStr,
-              shift_type: shiftType,
-              status: 'בעיה',
-              schedule_status: 'טיוטה',
-              exception_reason: 'אין עובד זמין - כל העובדים הגיעו למגבלה השבועית/חודשית או לא זמינים',
-              unassignment_details: unassignmentDetails,
-            });
-            unassignedShifts.push({ date: dateStr, type: shiftType });
           }
+
+          // בדוק אילוץ חוזר (רק מאושרים)
+          const dayOfWeek = getDay(new Date(dateStr));
+          const recurringConstraint = recurringConstraints.find(
+            rc => rc.employee_id === empId && rc.day_of_week === dayOfWeek && rc.unavailable && rc.status === 'אושר'
+          );
+          if (recurringConstraint) {
+            alerts.push({
+              type: 'error',
+              employeeId: empId,
+              employeeName: employee.full_name,
+              date: dateStr,
+              shiftType: shiftType,
+              message: `${employee.full_name} שובץ למשמרת ${shiftType} ב-${dateStr} למרות אילוץ קבוע`,
+              reason: recurringConstraint.notes || 'אילוץ קבוע (לימודים/התחייבות)'
+            });
+          }
+
+          // בדוק חופשות מאושרות
+          const vacation = vacationRequests.find(v => 
+            v.employee_id === empId && 
+            v.status === 'אושר' &&
+            dateStr >= v.start_date && 
+            dateStr <= v.end_date
+          );
+          if (vacation) {
+            alerts.push({
+              type: 'error',
+              employeeId: empId,
+              employeeName: employee.full_name,
+              date: dateStr,
+              shiftType: shiftType,
+              message: `${employee.full_name} שובץ למשמרת ${shiftType} ב-${dateStr} למרות שיש לו ${vacation.type} מאושרת`,
+              reason: `${vacation.type} מאושרת`
+            });
+          }
+          
+          newShifts.push({
+            date: dateStr,
+            shift_type: shiftType,
+            assigned_employee_id: empId,
+            start_time: times.start,
+            end_time: times.end,
+            status: 'תקין',
+            schedule_status: 'טיוטה',
+          });
+
+          assignShift(empId, day, shiftType);
+        } else {
+          // לא נמצא עובד זמין - אסוף סיבות מכל העובדים
+          const unassignmentDetails = activeEmployees.map(emp => ({
+            employee_id: emp.id,
+            employee_name: emp.full_name,
+            reasons: getEmployeeUnavailabilityReasons(emp.id, day, shiftType)
+          })).filter(detail => detail.reasons.length > 0);
+
+          newShifts.push({
+            date: dateStr,
+            shift_type: shiftType,
+            status: 'בעיה',
+            schedule_status: 'טיוטה',
+            exception_reason: 'אין עובד זמין - כל העובדים הגיעו למגבלה השבועית/חודשית או לא זמינים',
+            unassignment_details: unassignmentDetails,
+          });
+          unassignedShifts.push({ date: dateStr, type: shiftType });
         }
+      }
       }
 
       // צור משמרות ב-batches כדי לא לעבור rate limit

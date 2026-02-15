@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, LogOut, Calendar, Briefcase, Users } from 'l
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import NotificationBell from '../components/notifications/NotificationBell';
+import UpcomingVacationAlerts from '../components/notifications/UpcomingVacationAlerts';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -381,6 +382,11 @@ export default function EmployeeConstraints() {
             <Button onClick={() => setRecurringDialogOpen(true)} variant="outline">
               🔄 אילוצים קבועים
             </Button>
+            <Link to={createPageUrl('EmployeePreferences')}>
+              <Button variant="outline">
+                ⭐ העדפות מתקדמות
+              </Button>
+            </Link>
             <Button 
               onClick={async () => {
                 if (confirm('האם אתה בטוח שברצונך למחוק את כל האילוצים שלך?')) {
@@ -423,6 +429,8 @@ export default function EmployeeConstraints() {
             </div>
           </div>
         )}
+
+        <UpcomingVacationAlerts employeeId={currentEmployee.id} />
 
         {recurringConstraints.length > 0 && (
           <div className="bg-orange-50 border-2 border-orange-400 rounded-lg p-4 mb-6">

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, getMonth, getYear, getDay, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, parseISO } from 'date-fns';
-import { ChevronLeft, ChevronRight, Sparkles, Users, LogOut, AlertCircle, ArrowLeftRight, Plus, Filter, Briefcase } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Sparkles, Users, LogOut, AlertCircle, ArrowLeftRight, Plus, Filter, Briefcase, Home } from 'lucide-react';
 import NotificationBell from '../components/notifications/NotificationBell';
 import VacationManager from '../components/vacations/VacationManager';
 import { Button } from '@/components/ui/button';
@@ -1149,6 +1149,12 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
           
           <div className="flex gap-3 flex-wrap">
             {currentUser && <NotificationBell userId={currentUser.id} />}
+            <Link to={createPageUrl('ManagerDashboardHome')}>
+              <Button variant="outline">
+                <Home className="w-4 h-4 ml-2" />
+                לוח בקרה
+              </Button>
+            </Link>
             <Link to={createPageUrl('VacationManagement')}>
               <Button variant="outline">
                 <Briefcase className="w-4 h-4 ml-2" />

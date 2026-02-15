@@ -60,6 +60,7 @@ import ManagerDashboardHome from './pages/ManagerDashboardHome';
 import RecurringConstraints from './pages/RecurringConstraints';
 import VacationManagement from './pages/VacationManagement';
 import AdvancedPlanningTools from './pages/AdvancedPlanningTools';
+import EmployeeDashboard from './pages/EmployeeDashboard';
 import __Layout from './Layout.jsx';
 
 
@@ -77,6 +78,7 @@ export const PAGES = {
     "RecurringConstraints": RecurringConstraints,
     "VacationManagement": VacationManagement,
     "AdvancedPlanningTools": AdvancedPlanningTools,
+    "EmployeeDashboard": EmployeeDashboard,
 }
 
 export const pagesConfig = {

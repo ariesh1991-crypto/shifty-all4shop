@@ -787,6 +787,98 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
         return reasons;
       };
 
+      // פונקציה לניתוח איזון ההקצאה
+      const analyzeBalance = (employeeStats, employees) => {
+        const analysis = {
+          isBalanced: true,
+          suggestions: [],
+          stats: []
+        };
+
+        // חשב סטטיסטיקות לכל עובד
+        employees.forEach(emp => {
+          const stats = employeeStats[emp.id];
+          const weekTypes = Object.values(stats.weeklyShiftTypes).flat();
+          const morningCount = weekTypes.filter(t => t === 'מסיים ב-17:30').length;
+          const eveningCount = weekTypes.filter(t => t === 'מסיים ב-19:00').length;
+          
+          analysis.stats.push({
+            employeeId: emp.id,
+            employeeName: emp.full_name,
+            totalShifts: stats.totalShifts,
+            fridayShifts: stats.fridayCount,
+            morningShifts: morningCount,
+            eveningShifts: eveningCount,
+            fridayLong: stats.fridayLongCount,
+            fridayShort: stats.fridayShortCount
+          });
+        });
+
+        // בדוק פערים גדולים
+        const totalShifts = analysis.stats.map(s => s.totalShifts);
+        const avgShifts = totalShifts.reduce((a, b) => a + b, 0) / totalShifts.length;
+        const maxShifts = Math.max(...totalShifts);
+        const minShifts = Math.min(...totalShifts);
+        const gap = maxShifts - minShifts;
+
+        // אם יש פער של יותר מ-3 משמרות - אזהרה
+        if (gap > 3) {
+          analysis.isBalanced = false;
+          
+          const maxEmployee = analysis.stats.find(s => s.totalShifts === maxShifts);
+          const minEmployee = analysis.stats.find(s => s.totalShifts === minShifts);
+          
+          analysis.suggestions.push({
+            employeeId: maxEmployee.employeeId,
+            employeeName: maxEmployee.employeeName,
+            message: `${maxEmployee.employeeName} עם ${maxShifts} משמרות לעומת ${minEmployee.employeeName} עם ${minShifts} - פער של ${gap}`,
+            reason: 'חוסר איזון בחלוקת משמרות',
+            severity: gap > 5 ? 'high' : 'medium'
+          });
+        }
+
+        // בדוק איזון משמרות ערב
+        const eveningShifts = analysis.stats.map(s => s.eveningShifts);
+        const maxEvening = Math.max(...eveningShifts);
+        const minEvening = Math.min(...eveningShifts);
+        const eveningGap = maxEvening - minEvening;
+
+        if (eveningGap > 2 && maxEvening > 0) {
+          analysis.isBalanced = false;
+          const maxEmpEvening = analysis.stats.find(s => s.eveningShifts === maxEvening);
+          
+          analysis.suggestions.push({
+            employeeId: maxEmpEvening.employeeId,
+            employeeName: maxEmpEvening.employeeName,
+            message: `${maxEmpEvening.employeeName} עם ${maxEvening} משמרות ערב - לא מאוזן`,
+            reason: 'יותר מדי משמרות ערב לעובד אחד',
+            severity: 'medium'
+          });
+        }
+
+        // בדוק איזון שישי
+        const fridayShifts = analysis.stats.map(s => s.fridayShifts);
+        const maxFriday = Math.max(...fridayShifts);
+        const minFriday = Math.min(...fridayShifts);
+        
+        if (maxFriday - minFriday > 1 && maxFriday > 1) {
+          const maxFridayEmp = analysis.stats.find(s => s.fridayShifts === maxFriday);
+          const minFridayEmp = analysis.stats.find(s => s.fridayShifts === minFriday);
+          
+          if (minFridayEmp && maxFridayEmp) {
+            analysis.suggestions.push({
+              employeeId: maxFridayEmp.employeeId,
+              employeeName: maxFridayEmp.employeeName,
+              message: `שישי: ${maxFridayEmp.employeeName} (${maxFriday}) vs ${minFridayEmp.employeeName} (${minFriday})`,
+              reason: 'חוסר איזון במשמרות שישי',
+              severity: 'low'
+            });
+          }
+        }
+
+        return analysis;
+      };
+
       // פונקציה לבחור עובד למשמרת (בחירה הוגנת + כיבוד העדפות)
       // פונקציית עזר לחישוב ציון עובד למשמרת (ככל שגבוה יותר - יותר טוב)
       const calculateEmployeeScore = (empId, date, shiftType) => {
@@ -796,40 +888,54 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
         const dateStr = format(date, 'yyyy-MM-dd');
         const dayOfWeek = getDay(date);
         const isFridayShift = shiftType.includes('שישי');
-        let score = 1000; // בסיס גבוה יותר
+        let score = 2000; // בסיס גבוה
 
-        // הוגנות - קריטית! העדיף עובדים עם פחות משמרות
-        score -= stats.totalShifts * 50;
+        // הוגנות - משקל עליון! זה החשוב ביותר
+        // ככל שיש לעובד יותר משמרות, הציון יורד משמעותית
+        score -= stats.totalShifts * 100;
         
-        // עובד ללא משמרות שישי בכלל - בונוס ענק
+        // איזון בין סוגי משמרות - עדיף עובד עם פחות ערב אם זו משמרת ערב
+        if (shiftType === 'מסיים ב-19:00') {
+          const eveningCount = Object.values(stats.weeklyShiftTypes).flat().filter(t => t === 'מסיים ב-19:00').length;
+          score -= eveningCount * 80;
+        }
+        if (shiftType === 'מסיים ב-17:30') {
+          const morningCount = Object.values(stats.weeklyShiftTypes).flat().filter(t => t === 'מסיים ב-17:30').length;
+          score -= morningCount * 80;
+        }
+        
+        // עובד ללא משמרות שישי בכלל - בונוס גדול
         if (isFridayShift && stats.fridayCount === 0) {
-          score += 500;
+          score += 600;
+        } else if (isFridayShift) {
+          // עדיף מי שעשה פחות שישי
+          score -= stats.fridayCount * 200;
         }
 
-        // העדפות שישי - משקל עליון!
-        if (shiftType === 'שישי ארוך' && employee.friday_preference === 'long') score += 800;
-        if (shiftType === 'שישי קצר' && employee.friday_preference === 'short') score += 800;
-        if (shiftType.includes('שישי') && employee.friday_preference === 'avoid') score -= 300;
+        // העדפות שישי - משקל גבוה אבל לא עולה על ההוגנות
+        if (shiftType === 'שישי ארוך' && employee.friday_preference === 'long') score += 500;
+        if (shiftType === 'שישי קצר' && employee.friday_preference === 'short') score += 500;
+        if (shiftType.includes('שישי') && employee.friday_preference === 'avoid') score -= 400;
         
-        // העדפות ספציפיות למשמרת - משקל גבוה
-        if (employee.preferred_shift_times?.includes(shiftType)) score += 400;
-        if (employee.blocked_shift_times?.includes(shiftType)) score -= 600;
+        // העדפות ספציפיות למשמרת - משקל בינוני
+        if (employee.preferred_shift_times?.includes(shiftType)) score += 300;
+        if (employee.blocked_shift_times?.includes(shiftType)) score -= 700;
 
-        // העדפות ימים
-        if (employee.preferred_days?.includes(dayOfWeek)) score += 100;
-        if (employee.blocked_days?.includes(dayOfWeek)) score -= 200;
+        // העדפות ימים - משקל נמוך
+        if (employee.preferred_days?.includes(dayOfWeek)) score += 80;
+        if (employee.blocked_days?.includes(dayOfWeek)) score -= 250;
 
-        // העדפות בוקר/ערב לפי יום
-        if (shiftType === 'מסיים ב-17:30' && employee.morning_preferred_days?.includes(dayOfWeek)) score += 80;
-        if (shiftType === 'מסיים ב-19:00' && employee.evening_preferred_days?.includes(dayOfWeek)) score += 80;
+        // העדפות בוקר/ערב לפי יום - משקל נמוך
+        if (shiftType === 'מסיים ב-17:30' && employee.morning_preferred_days?.includes(dayOfWeek)) score += 60;
+        if (shiftType === 'מסיים ב-19:00' && employee.evening_preferred_days?.includes(dayOfWeek)) score += 60;
 
-        // בדוק אילוץ ספציפי לתאריך - אם יש העדפה מפורשת לשעות
+        // אילוץ ספציפי בתאריך - משקל גבוה מאוד
         const constraint = constraints.find(c => c.employee_id === empId && c.date === dateStr);
         if (constraint?.preference) {
           const preferenceMatches = 
             (constraint.preference === 'מעדיף מסיים ב-17:30' && shiftType === 'מסיים ב-17:30') ||
             (constraint.preference === 'מעדיף מסיים ב-19:00' && shiftType === 'מסיים ב-19:00');
-          if (preferenceMatches) score += 1000; // בונוס ענק להעדפה בתאריך ספציפי
+          if (preferenceMatches) score += 1200;
         }
 
         return score;
@@ -1136,6 +1242,9 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
         }
       }
 
+      // ניתוח איזון לפני יצירה
+      const balanceAnalysis = analyzeBalance(employeeStats, activeEmployees);
+      
       // צור משמרות ב-batches כדי לא לעבור rate limit
       const createBatchSize = 5;
       for (let i = 0; i < newShifts.length; i += createBatchSize) {
@@ -1148,15 +1257,33 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
       
       queryClient.invalidateQueries(['shifts']);
 
-      // הצג סיכום פשוט
+      // הצג סיכום עם ניתוח איזון
       const assignedCount = newShifts.filter(s => s.assigned_employee_id).length;
+      
+      let balanceMessage = '';
+      if (balanceAnalysis.isBalanced) {
+        balanceMessage = ' • החלוקה מאוזנת ✓';
+      } else if (balanceAnalysis.suggestions.length > 0) {
+        balanceMessage = ` • ${balanceAnalysis.suggestions.length} הצעות לאיזון`;
+      }
+      
       toast({
         title: 'הסקיצה נוצרה',
-        description: `${assignedCount} משמרות שובצו${alerts.length > 0 ? ` • ${alerts.length} התראות` : ''}`,
+        description: `${assignedCount} משמרות שובצו${alerts.length > 0 ? ` • ${alerts.length} התראות` : ''}${balanceMessage}`,
       });
 
-      // עדכן התראות
-      setScheduleAlerts(alerts);
+      // עדכן התראות והוסף המלצות איזון
+      const balanceAlerts = balanceAnalysis.suggestions.map(sugg => ({
+        type: 'warning',
+        employeeId: sugg.employeeId,
+        employeeName: sugg.employeeName,
+        date: '',
+        shiftType: '',
+        message: sugg.message,
+        reason: sugg.reason
+      }));
+      
+      setScheduleAlerts([...alerts, ...balanceAlerts]);
 
       // הפעל AI לניתוח קונפליקטים אם יש בעיות משמעותיות
       if (unassignedShifts.length > 0 || alerts.length > 3) {

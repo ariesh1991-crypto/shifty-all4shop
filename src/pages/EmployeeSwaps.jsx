@@ -176,7 +176,7 @@ export default function EmployeeSwaps() {
               <TableBody>
                 {myShifts.map((shift) => (
                   <TableRow key={shift.id}>
-                    <TableCell>{format(new Date(shift.date), 'dd/MM/yyyy')}</TableCell>
+                    <TableCell>{format(new Date(shift.date + 'T00:00:00'), 'dd/MM/yyyy')}</TableCell>
                     <TableCell>{shift.shift_type}</TableCell>
                     <TableCell>{shift.start_time} - {shift.end_time}</TableCell>
                     <TableCell>
@@ -223,8 +223,8 @@ export default function EmployeeSwaps() {
                       <TableCell>
                         {shift ? (
                           <div>
-                            <div className="font-medium">{format(new Date(shift.date), 'dd/MM/yyyy')}</div>
-                            <div className="text-sm text-gray-600">{['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'][getDay(new Date(shift.date))]}</div>
+                            <div className="font-medium">{format(new Date(shift.date + 'T00:00:00'), 'dd/MM/yyyy')}</div>
+                            <div className="text-sm text-gray-600">{['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'][getDay(new Date(shift.date + 'T00:00:00'))]}</div>
                             <div className="text-sm">{shift.shift_type}</div>
                             <div className="text-xs text-gray-500">{shift.start_time} - {shift.end_time}</div>
                           </div>
@@ -262,12 +262,14 @@ export default function EmployeeSwaps() {
             <DialogHeader>
               <DialogTitle>בקשת החלפת משמרת</DialogTitle>
             </DialogHeader>
-            <SwapRequestForm
-              shift={selectedShift}
-              currentEmployeeId={currentEmployee.id}
-              employees={employees.filter(e => e.id !== currentEmployee.id && e.active)}
-              onSave={(data) => createSwapMutation.mutate(data)}
-            />
+            {selectedShift && (
+              <SwapRequestForm
+                shift={selectedShift}
+                currentEmployeeId={currentEmployee.id}
+                employees={employees.filter(e => e.id !== currentEmployee.id && e.active)}
+                onSave={(data) => createSwapMutation.mutate(data)}
+              />
+            )}
           </DialogContent>
         </Dialog>
       </div>
@@ -278,6 +280,17 @@ export default function EmployeeSwaps() {
 function SwapRequestForm({ shift, currentEmployeeId, employees, onSave }) {
   const [targetEmployeeId, setTargetEmployeeId] = useState('');
   const [notes, setNotes] = useState('');
+  const [showAI, setShowAI] = useState(false);
+  const [currentEmployee, setCurrentEmployee] = useState(null);
+
+  useEffect(() => {
+    const loadEmp = async () => {
+      const all = await base44.entities.Employee.list();
+      const emp = all.find(e => e.id === currentEmployeeId);
+      setCurrentEmployee(emp);
+    };
+    loadEmp();
+  }, [currentEmployeeId]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -294,8 +307,30 @@ function SwapRequestForm({ shift, currentEmployeeId, employees, onSave }) {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="bg-gray-50 p-3 rounded">
         <p className="text-sm text-gray-600">משמרת: {shift?.shift_type}</p>
-        <p className="text-sm text-gray-600">תאריך: {shift ? format(new Date(shift.date), 'dd/MM/yyyy') : ''}</p>
+        <p className="text-sm text-gray-600">תאריך: {shift ? format(new Date(shift.date + 'T00:00:00'), 'dd/MM/yyyy') : ''}</p>
         <p className="text-sm text-gray-600">שעות: {shift?.start_time} - {shift?.end_time}</p>
+      </div>
+
+      <div>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full mb-3"
+          onClick={() => setShowAI(!showAI)}
+        >
+          ✨ {showAI ? 'הסתר' : 'הצג'} המלצות AI למועמדים
+        </Button>
+        
+        {showAI && currentEmployee && (
+          <SwapSuggestionAssistant
+            shift={shift}
+            currentEmployee={currentEmployee}
+            onSelectEmployee={(emp) => {
+              setTargetEmployeeId(emp.id);
+              setShowAI(false);
+            }}
+          />
+        )}
       </div>
 
       <div>
@@ -323,7 +358,7 @@ function SwapRequestForm({ shift, currentEmployeeId, employees, onSave }) {
       </div>
 
       <div className="flex gap-3 justify-end">
-        <Button type="submit">שלח בקשה</Button>
+        <Button type="submit" disabled={!targetEmployeeId}>שלח בקשה</Button>
       </div>
     </form>
   );

@@ -24,18 +24,20 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-// צבעים לפי עובד
+// צבעים לפי עובד - עמוקים יותר כדי שיהיו מובחנים מחופשות/אילוצים
 const EMPLOYEE_COLORS = [
-  'bg-blue-200',
-  'bg-purple-200', 
-  'bg-pink-200',
-  'bg-green-200',
-  'bg-yellow-200',
-  'bg-orange-200',
-  'bg-cyan-200',
-  'bg-indigo-200',
-  'bg-red-200',
-  'bg-teal-200',
+  'bg-blue-300',
+  'bg-purple-300', 
+  'bg-pink-300',
+  'bg-rose-300',
+  'bg-fuchsia-300',
+  'bg-violet-300',
+  'bg-cyan-300',
+  'bg-indigo-300',
+  'bg-sky-300',
+  'bg-teal-300',
+  'bg-lime-300',
+  'bg-emerald-300',
 ];
 
 const getEmployeeColor = (employeeId, employees) => {
@@ -1225,9 +1227,9 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
             {dayRecurringConstraints.map(rc => {
               const emp = employees.find(e => e.id === rc.employee_id);
               return (
-                <div key={rc.id} className="text-[10px] p-1 rounded bg-orange-200 border border-orange-400">
-                  <div className="font-bold text-orange-900">🔄 {emp?.full_name}</div>
-                  {rc.notes && <div className="text-orange-700 text-[9px]">{rc.notes}</div>}
+                <div key={rc.id} className="text-[10px] p-1 rounded bg-amber-300 border-2 border-amber-600">
+                  <div className="font-bold text-amber-950">🔄 {emp?.full_name}</div>
+                  {rc.notes && <div className="text-amber-900 text-[9px]">{rc.notes}</div>}
                 </div>
               );
             })}
@@ -1243,13 +1245,13 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
                 return dateStr >= v.start_date && dateStr <= v.end_date;
               });
               return (
-                <div key={`vacation-${emp.id}`} className="text-xs p-1 rounded bg-green-200 border-2 border-green-600">
-                  <div className="font-bold text-green-900 flex items-center gap-1">
+                <div key={`vacation-${emp.id}`} className="text-xs p-1 rounded bg-green-300 border-2 border-green-700">
+                  <div className="font-bold text-green-950 flex items-center gap-1">
                     🏖️ {emp.full_name}
                   </div>
-                  <div className="text-green-800 text-[10px] font-bold">{vacation.type}</div>
+                  <div className="text-green-900 text-[10px] font-bold">{vacation.type}</div>
                   {vacation.notes && (
-                    <div className="text-[9px] text-green-700 mt-1">{vacation.notes}</div>
+                    <div className="text-[9px] text-green-800 mt-1">{vacation.notes}</div>
                   )}
                 </div>
               );

@@ -54,7 +54,7 @@ export default function PrintSchedule({ year, month, shifts, employees }) {
       
       <div className="print-header">
         <h1>לוח משמרות</h1>
-        <h2>{format(new Date(year, month - 1), 'MMMM yyyy', { locale: { code: 'he' } })}</h2>
+        <h2>{year}-{String(month).padStart(2, '0')}</h2>
       </div>
 
       <table className="print-table">

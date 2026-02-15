@@ -1453,7 +1453,12 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
           </DialogContent>
         </Dialog>
 
-        <Dialog open={aiSuggestionsDialogOpen} onOpenChange={setAiSuggestionsDialogOpen}>
+        <Dialog open={aiSuggestionsDialogOpen} onOpenChange={(open) => {
+          setAiSuggestionsDialogOpen(open);
+          if (!open) {
+            setAiSuggestions(null);
+          }
+        }}>
           <DialogContent dir="rtl" className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
@@ -1538,21 +1543,31 @@ function AISuggestionsView({ suggestions }) {
               >
                 <div className="flex items-start justify-between mb-2">
                   <div>
-                    <div className="font-bold">{conflict.type}</div>
+                    <div className="font-bold text-lg">{conflict.type}</div>
                     <Badge variant="outline" className="mt-1">{conflict.severity}</Badge>
                   </div>
                 </div>
-                <p className="text-sm mb-2">{conflict.description}</p>
-                {conflict.affected_dates && conflict.affected_dates.length > 0 && (
-                  <div className="text-xs mt-2">
-                    <strong>תאריכים:</strong> {conflict.affected_dates.join(', ')}
-                  </div>
-                )}
-                {conflict.affected_employees && conflict.affected_employees.length > 0 && (
-                  <div className="text-xs mt-1">
-                    <strong>עובדים:</strong> {conflict.affected_employees.join(', ')}
-                  </div>
-                )}
+                <p className="text-sm mb-3 font-medium">{conflict.description}</p>
+                <div className="bg-white bg-opacity-60 rounded-lg p-3 space-y-2">
+                  {conflict.affected_dates && conflict.affected_dates.length > 0 && (
+                    <div className="text-sm">
+                      <strong className="text-gray-700">📅 תאריכים מושפעים:</strong>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {conflict.affected_dates.map((date, i) => (
+                          <Badge key={i} variant="secondary" className="text-xs">
+                            {format(new Date(date), 'dd/MM/yyyy')}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {conflict.affected_employees && conflict.affected_employees.length > 0 && (
+                    <div className="text-sm">
+                      <strong className="text-gray-700">👥 עובדים מושפעים:</strong>
+                      <div className="mt-1 text-gray-800">{conflict.affected_employees.join(', ')}</div>
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
           </div>

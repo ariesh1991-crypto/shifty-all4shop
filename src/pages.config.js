@@ -49,32 +49,32 @@
  */
 import AllConstraints from './pages/AllConstraints';
 import EmployeeConstraints from './pages/EmployeeConstraints';
+import EmployeePreferences from './pages/EmployeePreferences';
 import EmployeeShifts from './pages/EmployeeShifts';
+import EmployeeShiftsReport from './pages/EmployeeShiftsReport';
 import EmployeeSwaps from './pages/EmployeeSwaps';
 import Home from './pages/Home';
 import ManageEmployees from './pages/ManageEmployees';
 import ManagerDashboard from './pages/ManagerDashboard';
+import ManagerDashboardHome from './pages/ManagerDashboardHome';
 import RecurringConstraints from './pages/RecurringConstraints';
 import VacationManagement from './pages/VacationManagement';
-import ManagerDashboardHome from './pages/ManagerDashboardHome';
-import EmployeePreferences from './pages/EmployeePreferences';
-import EmployeeShiftsReport from './pages/EmployeeShiftsReport';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
     "AllConstraints": AllConstraints,
     "EmployeeConstraints": EmployeeConstraints,
+    "EmployeePreferences": EmployeePreferences,
     "EmployeeShifts": EmployeeShifts,
+    "EmployeeShiftsReport": EmployeeShiftsReport,
     "EmployeeSwaps": EmployeeSwaps,
     "Home": Home,
     "ManageEmployees": ManageEmployees,
     "ManagerDashboard": ManagerDashboard,
+    "ManagerDashboardHome": ManagerDashboardHome,
     "RecurringConstraints": RecurringConstraints,
     "VacationManagement": VacationManagement,
-    "ManagerDashboardHome": ManagerDashboardHome,
-    "EmployeePreferences": EmployeePreferences,
-    "EmployeeShiftsReport": EmployeeShiftsReport,
 }
 
 export const pagesConfig = {

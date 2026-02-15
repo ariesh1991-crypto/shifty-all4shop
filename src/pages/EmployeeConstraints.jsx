@@ -421,11 +421,15 @@ export default function EmployeeConstraints() {
               ⏳ יש לך {pendingVacations.length} בקשות חופשה ממתינות לאישור
             </h3>
             <div className="space-y-2">
-              {pendingVacations.map(v => (
-               <div key={v.id} className="text-sm text-yellow-700">
-                 • {v.type}: {format(new Date(v.start_date), 'dd/MM/yyyy')} - {format(new Date(v.end_date), 'dd/MM/yyyy')}
-               </div>
-              ))}
+              {pendingVacations.map(v => {
+                const start = new Date(v.start_date + 'T00:00:00');
+                const end = new Date(v.end_date + 'T00:00:00');
+                return (
+                  <div key={v.id} className="text-sm text-yellow-700">
+                    • {v.type}: {format(start, 'dd/MM/yyyy')} - {format(end, 'dd/MM/yyyy')}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -589,11 +593,14 @@ export default function EmployeeConstraints() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {vacationRequests.map(v => (
-                  <TableRow key={v.id}>
-                    <TableCell>
-                      {format(new Date(v.start_date), 'dd/MM/yyyy')} - {format(new Date(v.end_date), 'dd/MM/yyyy')}
-                    </TableCell>
+                {vacationRequests.map(v => {
+                  const start = new Date(v.start_date + 'T00:00:00');
+                  const end = new Date(v.end_date + 'T00:00:00');
+                  return (
+                    <TableRow key={v.id}>
+                      <TableCell>
+                        {format(start, 'dd/MM/yyyy')} - {format(end, 'dd/MM/yyyy')}
+                      </TableCell>
                     <TableCell>{v.type}</TableCell>
                     <TableCell>
                       <Badge variant={
@@ -609,7 +616,8 @@ export default function EmployeeConstraints() {
                       {v.notes && <div className="text-xs text-gray-500 mt-1">{v.notes}</div>}
                     </TableCell>
                   </TableRow>
-                ))}
+                   );
+                 })}
               </TableBody>
             </Table>
           )}

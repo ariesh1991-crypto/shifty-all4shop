@@ -608,8 +608,20 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
           return false;
         }
 
-        // חוק: מי שעשה ארוכה בחמישי לא יעבוד בשישי (העדפה חזקה, לא חסימה מוחלטת)
-        // הלוגיקה מטופלת בחישוב הניקוד - לא חוסמים כאן
+        // חוק חשוב: מי שעשה ארוכה בחמישי לא יעבוד שישי ארוך
+        if (isFridayShift && shiftType === 'שישי ארוך') {
+          const thursdayDate = addDays(date, -1);
+          const thursdayStr = format(thursdayDate, 'yyyy-MM-dd');
+          const weekTypes = stats.weeklyShiftTypes[weekNum] || [];
+          
+          if (stats.assignedDates.has(thursdayStr)) {
+            const thursdayTypes = weekTypes.filter(t => !t.includes('שישי'));
+            if (thursdayTypes.includes('מסיים ב-19:00')) {
+              if (isNufer) console.log(`נופר עשתה ארוכה בחמישי - לא יכולה לעשות שישי ארוך`);
+              return false; // חסימה מוחלטת
+            }
+          }
+        }
 
         // בדוק מגבלת שבוע (מקסימום 2 משמרות רגילות, לא כולל שישי)
         const weekShifts = stats.weeklyShifts[weekNum] || 0;
@@ -727,7 +739,7 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
           reasons.push('יום חסום');
         }
 
-        // בדוק חוק חמישי-שישי (העדפה חזקה, לא חסימה)
+        // בדוק חוק חמישי-שישי
         if (isFridayShift) {
           const thursdayDate = addDays(new Date(dateStr), -1);
           const thursdayStr = format(thursdayDate, 'yyyy-MM-dd');
@@ -736,7 +748,7 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
           if (stats.assignedDates.has(thursdayStr)) {
             const thursdayTypes = weekTypes.filter(t => !t.includes('שישי'));
             if (thursdayTypes.includes('מסיים ב-19:00') && shiftType === 'שישי ארוך') {
-              reasons.push('לא מומלץ: עשה ארוכה בחמישי');
+              reasons.push('עשה ארוכה בחמישי');
             }
           }
         }
@@ -806,20 +818,7 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
         // בדוק גם העדפות ספציפיות
         if (employee.preferred_shift_times?.includes(shiftType)) score += 150;
 
-        // קנס גבוה מאוד: שישי ארוך אחרי חמישי ארוך
-        if (isFridayShift && shiftType === 'שישי ארוך') {
-          const thursdayDate = addDays(date, -1);
-          const thursdayStr = format(thursdayDate, 'yyyy-MM-dd');
-          const weekTypes = stats.weeklyShiftTypes[weekNum] || [];
-          
-          if (stats.assignedDates.has(thursdayStr)) {
-            const thursdayTypes = weekTypes.filter(t => !t.includes('שישי'));
-            if (thursdayTypes.includes('מסיים ב-19:00')) {
-              // קנס ענק - מאוד לא רצוי אבל לא חוסם לגמרי
-              score -= 500;
-            }
-          }
-        }
+        // הקנס מוסר - החסימה היא ב-canAssignShift
 
         // הוגנות - העדיף עובדים עם פחות משמרות
         score -= stats.totalShifts * 3;

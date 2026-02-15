@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { Users, Calendar, AlertCircle, CheckCircle, Clock, TrendingUp, ArrowRight } from 'lucide-react';
+import { Users, Calendar, AlertCircle, CheckCircle, Clock, TrendingUp, ArrowRight, LogOut } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { format, addDays, isBefore, parseISO } from 'date-fns';
+import NotificationBell from '../components/notifications/NotificationBell';
 
 export default function ManagerDashboardHome() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -50,17 +51,14 @@ export default function ManagerDashboardHome() {
     queryFn: () => base44.entities.RecurringConstraint.list(),
   });
 
-  // חישובי סטטיסטיקות
   const activeEmployees = employees.filter(e => e.active).length;
   const pendingVacations = vacationRequests.filter(v => v.status === 'ממתין לאישור').length;
   const pendingSwaps = swapRequests.filter(s => s.status === 'ממתין לאישור').length;
   const pendingRecurring = recurringConstraints.filter(rc => rc.status === 'ממתין לאישור').length;
 
-  // משמרות בעייתיות
   const problematicShifts = shifts.filter(s => s.status === 'בעיה').length;
   const unassignedShifts = shifts.filter(s => !s.assigned_employee_id && s.status !== 'בעיה').length;
 
-  // התראות קרובות - חופשות שמתחילות בעוד פחות מ-7 ימים
   const upcomingVacations = vacationRequests.filter(v => {
     if (v.status !== 'אושר') return false;
     const startDate = parseISO(v.start_date);
@@ -69,13 +67,11 @@ export default function ManagerDashboardHome() {
     return isBefore(today, startDate) && isBefore(startDate, sevenDaysFromNow);
   });
 
-  // אילוצי אי-זמינות בחודש הנוכחי
   const thisMonth = format(new Date(), 'yyyy-MM');
   const monthlyUnavailable = constraints.filter(c => 
     c.date && c.date.startsWith(thisMonth) && c.unavailable
   ).length;
 
-  // אילוצים חוזרים מאושרים
   const approvedRecurring = recurringConstraints.filter(rc => rc.status === 'אושר').length;
 
   return (
@@ -86,15 +82,21 @@ export default function ManagerDashboardHome() {
             <h1 className="text-4xl font-bold text-gray-800">לוח בקרה מנהל</h1>
             <p className="text-gray-600 mt-2">סקירה כללית של מערכת ניהול המשמרות</p>
           </div>
-          <Link to={createPageUrl('ManagerDashboard')}>
-            <Button>
-              <Calendar className="w-4 h-4 ml-2" />
-              לוח משמרות מלא
+          <div className="flex gap-3">
+            {currentUser && <NotificationBell userId={currentUser.id} />}
+            <Link to={createPageUrl('ManagerDashboard')}>
+              <Button>
+                <Calendar className="w-4 h-4 ml-2" />
+                לוח משמרות מלא
+              </Button>
+            </Link>
+            <Button onClick={() => base44.auth.logout()} variant="outline">
+              <LogOut className="w-4 h-4 ml-2" />
+              יציאה
             </Button>
-          </Link>
+          </div>
         </div>
 
-        {/* כרטיסי סטטיסטיקות עיקריים */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -145,7 +147,6 @@ export default function ManagerDashboardHome() {
           </Card>
         </div>
 
-        {/* התראות ופעולות דרושות */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <Card>
             <CardHeader>
@@ -262,7 +263,6 @@ export default function ManagerDashboardHome() {
           </Card>
         </div>
 
-        {/* סיכום אילוצים */}
         <Card>
           <CardHeader>
             <CardTitle>סיכום אילוצים - חודש נוכחי</CardTitle>

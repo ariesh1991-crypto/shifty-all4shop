@@ -593,10 +593,15 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
           return false;
         }
 
-        // בדוק מגבלת שבוע (מקסימום 2 משמרות)
+        // בדוק מגבלת שבוע (מקסימום 2 משמרות רגילות, לא כולל שישי)
         const weekShifts = stats.weeklyShifts[weekNum] || 0;
-        if (weekShifts >= 2) {
-          if (isNufer) console.log(`נופר כבר עם 2 משמרות בשבוע ${weekNum}`);
+        // ספור רק משמרות רגילות (לא שישי)
+        const weekTypes = stats.weeklyShiftTypes[weekNum] || [];
+        const regularShiftsThisWeek = weekTypes.filter(t => !t.includes('שישי')).length;
+        
+        // אם זו משמרת רגילה וכבר יש 2 רגילות השבוע - חסום
+        if (!isFridayShift && regularShiftsThisWeek >= 2) {
+          if (isNufer) console.log(`נופר כבר עם 2 משמרות רגילות בשבוע ${weekNum}`);
           return false;
         }
 
@@ -618,12 +623,12 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
           }
         }
 
-        // בדוק חוק: משמרת שנייה בשבוע חייבת להיות מסוג שונה (לימים רגילים)
-        if (!isFridayShift && weekShifts === 1) {
-          const weekTypes = stats.weeklyShiftTypes[weekNum] || [];
-          if (weekTypes.includes(shiftType)) {
+        // בדוק חוק: משמרת שנייה רגילה בשבוע חייבת להיות מסוג שונה
+        if (!isFridayShift && regularShiftsThisWeek === 1) {
+          const regularTypes = weekTypes.filter(t => !t.includes('שישי'));
+          if (regularTypes.includes(shiftType)) {
             if (isNufer) console.log(`נופר כבר עם משמרת ${shiftType} השבוע`);
-            return false; // כבר יש לו משמרת מהסוג הזה השבוע
+            return false; // כבר יש לו משמרת רגילה מהסוג הזה השבוע
           }
         }
 
@@ -704,9 +709,11 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
           reasons.push('יום חסום');
         }
 
-        // בדוק מגבלת שבוע
-        const weekShifts = stats.weeklyShifts[weekNum] || 0;
-        if (weekShifts >= 2) {
+        // בדוק מגבלת שבוע - 2 משמרות רגילות מקסימום
+        const weekTypes = stats.weeklyShiftTypes[weekNum] || [];
+        const regularShiftsThisWeek = weekTypes.filter(t => !t.includes('שישי')).length;
+        
+        if (!isFridayShift && regularShiftsThisWeek >= 2) {
           reasons.push('חורג ממגבלת שבוע');
         }
 
@@ -725,10 +732,10 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
           }
         }
 
-        // בדוק חוק משמרת שנייה בשבוע
-        if (!isFridayShift && weekShifts === 1) {
-          const weekTypes = stats.weeklyShiftTypes[weekNum] || [];
-          if (weekTypes.includes(shiftType)) {
+        // בדוק חוק משמרת שנייה רגילה בשבוע
+        if (!isFridayShift && regularShiftsThisWeek === 1) {
+          const regularTypes = weekTypes.filter(t => !t.includes('שישי'));
+          if (regularTypes.includes(shiftType)) {
             reasons.push('כבר עם משמרת זהה השבוע');
           }
         }

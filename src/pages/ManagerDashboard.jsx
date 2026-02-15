@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, getMonth, getYear, getDay, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, parseISO, addDays } from 'date-fns';
-import { ChevronLeft, ChevronRight, Sparkles, Users, LogOut, AlertCircle, ArrowLeftRight, Plus, Filter, Briefcase, Home } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Sparkles, Users, LogOut, AlertCircle, ArrowLeftRight, Plus, Filter, Briefcase, Home, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import NotificationBell from '../components/notifications/NotificationBell';
 import VacationManager from '../components/vacations/VacationManager';
 import { Button } from '@/components/ui/button';
@@ -346,6 +347,29 @@ export default function ManagerDashboard() {
     }
 
     toast({ title: 'בקשת החופשה אושרה והתאריכים סומנו כלא זמין' });
+  };
+
+  const exportScheduleToExcel = () => {
+    const data = allShifts.map(shift => {
+      const employee = employees.find(e => e.id === shift.assigned_employee_id);
+      return {
+        'תאריך': shift.date,
+        'יום בשבוע': ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'][new Date(shift.date).getDay()],
+        'סוג משמרת': shift.shift_type,
+        'עובד': employee?.full_name || 'לא משובץ',
+        'שעת התחלה': shift.start_time || '',
+        'שעת סיום': shift.end_time || '',
+        'סטטוס': shift.status,
+        'סטטוס סידור': shift.schedule_status || '',
+        'סיבת חריגה': shift.exception_reason || '',
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'משמרות');
+    XLSX.writeFile(wb, `משמרות_${monthKey}.xlsx`);
+    toast({ title: 'הקובץ יוצא בהצלחה' });
   };
 
   const handleRejectVacation = async (vacationRequest, managerNotes) => {

@@ -10,9 +10,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowRight, Calendar, Check, X } from 'lucide-react';
+import { ArrowRight, Calendar, Check, X, Download } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
+import * as XLSX from 'xlsx';
 
 export default function VacationManagement() {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
@@ -193,6 +194,33 @@ export default function VacationManagement() {
   const approvedRequests = vacationRequests.filter(r => r.status === 'אושר');
   const rejectedRequests = vacationRequests.filter(r => r.status === 'נדחה');
 
+  const exportToExcel = (requests, sheetName) => {
+    const data = requests.map(req => {
+      const employee = employees.find(e => e.id === req.employee_id);
+      const startDate = new Date(req.start_date);
+      const endDate = new Date(req.end_date);
+      const dayCount = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+      
+      return {
+        'עובד': employee?.full_name || 'לא ידוע',
+        'מתאריך': format(startDate, 'dd/MM/yyyy'),
+        'עד תאריך': format(endDate, 'dd/MM/yyyy'),
+        'ימים': dayCount,
+        'סוג': req.type,
+        'סטטוס': req.status,
+        'הערות עובד': req.notes || '',
+        'הערות מנהל': req.manager_notes || '',
+        'תאריך הגשה': format(new Date(req.created_date), 'dd/MM/yyyy HH:mm'),
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    XLSX.writeFile(wb, `${sheetName}_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+    toast({ title: 'הקובץ יוצא בהצלחה' });
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6" dir="rtl">
       <div className="max-w-7xl mx-auto">
@@ -224,6 +252,14 @@ export default function VacationManagement() {
 
           <TabsContent value="pending">
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
+              {pendingRequests.length > 0 && (
+                <div className="p-4 border-b flex justify-end">
+                  <Button onClick={() => exportToExcel(pendingRequests, 'בקשות_ממתינות')} variant="outline" size="sm">
+                    <Download className="w-4 h-4 ml-2" />
+                    ייצא לאקסל
+                  </Button>
+                </div>
+              )}
               {pendingRequests.length === 0 ? (
                 <div className="text-center py-12 text-gray-500">
                   <Calendar className="w-12 h-12 mx-auto mb-3 text-gray-400" />
@@ -252,6 +288,14 @@ export default function VacationManagement() {
 
           <TabsContent value="approved">
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
+              {approvedRequests.length > 0 && (
+                <div className="p-4 border-b flex justify-end">
+                  <Button onClick={() => exportToExcel(approvedRequests, 'חופשות_מאושרות')} variant="outline" size="sm">
+                    <Download className="w-4 h-4 ml-2" />
+                    ייצא לאקסל
+                  </Button>
+                </div>
+              )}
               {approvedRequests.length === 0 ? (
                 <div className="text-center py-12 text-gray-500">
                   <Check className="w-12 h-12 mx-auto mb-3 text-gray-400" />
@@ -279,6 +323,14 @@ export default function VacationManagement() {
 
           <TabsContent value="rejected">
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
+              {rejectedRequests.length > 0 && (
+                <div className="p-4 border-b flex justify-end">
+                  <Button onClick={() => exportToExcel(rejectedRequests, 'בקשות_נדחות')} variant="outline" size="sm">
+                    <Download className="w-4 h-4 ml-2" />
+                    ייצא לאקסל
+                  </Button>
+                </div>
+              )}
               {rejectedRequests.length === 0 ? (
                 <div className="text-center py-12 text-gray-500">
                   <X className="w-12 h-12 mx-auto mb-3 text-gray-400" />

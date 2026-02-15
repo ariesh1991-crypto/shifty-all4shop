@@ -90,6 +90,11 @@ export default function ManagerDashboardHome() {
                 לוח משמרות מלא
               </Button>
             </Link>
+            <Link to={createPageUrl('EmployeeShiftsReport')}>
+              <Button variant="outline">
+                📊 דוח עובדים
+              </Button>
+            </Link>
             <Button onClick={() => base44.auth.logout()} variant="outline">
               <LogOut className="w-4 h-4 ml-2" />
               יציאה

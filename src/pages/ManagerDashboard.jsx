@@ -607,6 +607,37 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
           return false;
         }
 
+        // חוק חדש: מי שעשה ארוכה בחמישי לא יעבוד בשישי (אלא אם זה הכרחי)
+        if (isFridayShift) {
+          const dayOfWeek = getDay(date);
+          // מצא את יום חמישי (יום לפני)
+          const thursdayDate = addDays(date, -1);
+          const thursdayStr = format(thursdayDate, 'yyyy-MM-dd');
+          
+          // בדוק אם העובד עשה משמרת ארוכה בחמישי
+          const weekTypes = stats.weeklyShiftTypes[weekNum] || [];
+          const thursdayShift = weekTypes.find(t => {
+            // נבדוק אם יש משמרת ביום חמישי שמסתיימת ב-19:00
+            const hasThursdayEvening = stats.assignedDates.has(thursdayStr) && 
+                                      weekTypes.includes('מסיים ב-19:00');
+            return hasThursdayEvening;
+          });
+          
+          // אם עשה ארוכה בחמישי, העדף שלא לשבץ אותו לשישי
+          // אבל אם זה שישי ארוך - ממש לא רצוי
+          if (stats.assignedDates.has(thursdayStr)) {
+            // בדוק איזו משמרת עשה בחמישי
+            const thursdayTypes = weekTypes.filter(t => !t.includes('שישי'));
+            if (thursdayTypes.includes('מסיים ב-19:00')) {
+              // עשה ארוכה בחמישי - העדף מאוד לא לשבץ לשישי ארוך
+              if (shiftType === 'שישי ארוך') {
+                if (isNufer) console.log(`נופר עשתה ארוכה בחמישי - לא רצוי לשישי ארוך`);
+                return false; // חוק קשיח - לא לשבץ שישי ארוך אחרי חמישי ארוך
+              }
+            }
+          }
+        }
+
         // בדוק מגבלת שבוע (מקסימום 2 משמרות רגילות, לא כולל שישי)
         const weekShifts = stats.weeklyShifts[weekNum] || 0;
         // ספור רק משמרות רגילות (לא שישי)
@@ -723,6 +754,20 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
           reasons.push('יום חסום');
         }
 
+        // בדוק חוק חמישי-שישי
+        if (isFridayShift) {
+          const thursdayDate = addDays(new Date(dateStr), -1);
+          const thursdayStr = format(thursdayDate, 'yyyy-MM-dd');
+          const weekTypes = stats.weeklyShiftTypes[weekNum] || [];
+          
+          if (stats.assignedDates.has(thursdayStr)) {
+            const thursdayTypes = weekTypes.filter(t => !t.includes('שישי'));
+            if (thursdayTypes.includes('מסיים ב-19:00') && shiftType === 'שישי ארוך') {
+              reasons.push('עשה ארוכה בחמישי');
+            }
+          }
+        }
+        
         // בדוק מגבלת שבוע - 2 משמרות רגילות מקסימום
         const weekTypes = stats.weeklyShiftTypes[weekNum] || [];
         const regularShiftsThisWeek = weekTypes.filter(t => !t.includes('שישי')).length;
@@ -1433,6 +1478,13 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
             >
               <Sparkles className="w-4 h-4 ml-2" />
               {generating ? 'יוצר...' : 'צור סקיצת משמרות'}
+            </Button>
+            <Button 
+              onClick={() => window.print()}
+              variant="outline"
+            >
+              <Download className="w-4 h-4 ml-2" />
+              הדפס לוח משמרות
             </Button>
             <Button 
               onClick={() => approveScheduleMutation.mutate()}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { format } from 'date-fns';
+import { format, getDay } from 'date-fns';
 import { ArrowLeftRight, LogOut, ArrowRight, Bell } from 'lucide-react';
 import NotificationBell from '../components/notifications/NotificationBell';
 import { Button } from '@/components/ui/button';
@@ -220,7 +220,14 @@ export default function EmployeeSwaps() {
                   return (
                     <TableRow key={req.id}>
                       <TableCell>
-                        {shift ? `${format(new Date(shift.date), 'dd/MM/yyyy')} - ${shift.shift_type}` : '-'}
+                        {shift ? (
+                          <div>
+                            <div className="font-medium">{format(new Date(shift.date), 'dd/MM/yyyy')}</div>
+                            <div className="text-sm text-gray-600">{['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'][getDay(new Date(shift.date))]}</div>
+                            <div className="text-sm">{shift.shift_type}</div>
+                            <div className="text-xs text-gray-500">{shift.start_time} - {shift.end_time}</div>
+                          </div>
+                        ) : '-'}
                       </TableCell>
                       <TableCell>{requestingEmp?.full_name}</TableCell>
                       <TableCell>{targetEmp?.full_name}</TableCell>

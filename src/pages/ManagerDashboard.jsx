@@ -636,24 +636,24 @@ ${employeeList.slice(0, 10).map(e =>
         const isFridayShift = shiftType.includes('שישי');
         const isThursday = dayOfWeek === 4;
         
-        // דיבאג לנופר
-        const isNufer = employee.full_name === 'נופר';
+        // דיבאג לטל ולנופר
+        const isDebug = employee.full_name === 'טל' || employee.full_name === 'נופר';
 
         // בדוק שהעובד לא כבר משובץ באותו יום
         if (stats.assignedDates.has(dateStr)) {
-          if (isNufer) console.log(`נופר כבר משובצת ב-${dateStr}`);
+          if (isDebug) console.log(`${employee.full_name} כבר משובץ/ת ב-${dateStr}`);
           return false;
         }
 
         // בדוק זמינות
         if (!isEmployeeAvailable(empId, dateStr)) {
-          if (isNufer) console.log(`נופר לא זמינה ב-${dateStr}`);
+          if (isDebug) console.log(`${employee.full_name} לא זמין/ה ב-${dateStr}`);
           return false;
         }
 
         // בדוק אם המשמרת חסומה לעובד זה
         if (employee.blocked_shift_times && employee.blocked_shift_times.includes(shiftType)) {
-          if (isNufer) console.log(`נופר חסומה ממשמרת ${shiftType}`);
+          if (isDebug) console.log(`${employee.full_name} חסום/ה ממשמרת ${shiftType}`);
           return false;
         }
 
@@ -668,7 +668,7 @@ ${employeeList.slice(0, 10).map(e =>
           
           // אם העובד הזה עבד יותר חמישי מהמינימום, חסום אותו
           if (stats.thursdayCount > minThursdayCount) {
-            if (isNufer) console.log(`נופר כבר עם ${stats.thursdayCount} חמישיים, מינימום הוא ${minThursdayCount}`);
+            if (isDebug) console.log(`${employee.full_name} כבר עם ${stats.thursdayCount} חמישיים, מינימום הוא ${minThursdayCount}`);
             return false;
           }
           
@@ -681,7 +681,7 @@ ${employeeList.slice(0, 10).map(e =>
             ).length;
             
             if (othersWithNoLongThursday > 0) {
-              if (isNufer) console.log(`נופר כבר עשתה חמישי ארוך, יש ${othersWithNoLongThursday} אחרים שלא`);
+              if (isDebug) console.log(`${employee.full_name} כבר עשה/תה חמישי ארוך, יש ${othersWithNoLongThursday} אחרים שלא`);
               return false;
             }
           }
@@ -694,7 +694,7 @@ ${employeeList.slice(0, 10).map(e =>
             ).length;
             
             if (othersWithNoShortThursday > 0) {
-              if (isNufer) console.log(`נופר כבר עשתה חמישי קצר, יש ${othersWithNoShortThursday} אחרים שלא`);
+              if (isDebug) console.log(`${employee.full_name} כבר עשה/תה חמישי קצר, יש ${othersWithNoShortThursday} אחרים שלא`);
               return false;
             }
           }
@@ -709,7 +709,7 @@ ${employeeList.slice(0, 10).map(e =>
           if (stats.assignedDates.has(thursdayStr)) {
             const thursdayTypes = weekTypes.filter(t => !t.includes('שישי'));
             if (thursdayTypes.includes('מסיים ב-19:00')) {
-              if (isNufer) console.log(`נופר עשתה ארוכה בחמישי - לא יכולה לעשות שישי ארוך`);
+              if (isDebug) console.log(`${employee.full_name} עשה/תה ארוכה בחמישי - לא יכול/ה לעשות שישי ארוך`);
               return false; // חסימה מוחלטת
             }
           }
@@ -723,24 +723,24 @@ ${employeeList.slice(0, 10).map(e =>
         
         // אם זו משמרת רגילה וכבר יש 2 רגילות השבוע - חסום
         if (!isFridayShift && regularShiftsThisWeek >= 2) {
-          if (isNufer) console.log(`נופר כבר עם 2 משמרות רגילות בשבוע ${weekNum}`);
+          if (isDebug) console.log(`${employee.full_name} כבר עם ${regularShiftsThisWeek} משמרות רגילות בשבוע ${weekNum}, משמרות השבוע: ${weekTypes.join(', ')}`);
           return false;
         }
 
         // בדוק מגבלת שישי (מקסימום 2 לחודש)
         if (isFridayShift && stats.fridayCount >= 2) {
-          if (isNufer) console.log(`נופר כבר עם 2 משמרות שישי החודש`);
+          if (isDebug) console.log(`${employee.full_name} כבר עם 2 משמרות שישי החודש`);
           return false;
         }
 
         // חוק חשוב: אם עובד כבר עשה שישי אחד, השני חייב להיות מסוג שונה
         if (isFridayShift && stats.fridayCount === 1) {
           if (shiftType === 'שישי ארוך' && stats.fridayLongCount > 0) {
-            if (isNufer) console.log(`נופר כבר עשתה שישי ארוך`);
+            if (isDebug) console.log(`${employee.full_name} כבר עשה/תה שישי ארוך`);
             return false;
           }
           if (shiftType === 'שישי קצר' && stats.fridayShortCount > 0) {
-            if (isNufer) console.log(`נופר כבר עשתה שישי קצר`);
+            if (isDebug) console.log(`${employee.full_name} כבר עשה/תה שישי קצר`);
             return false;
           }
         }
@@ -749,12 +749,12 @@ ${employeeList.slice(0, 10).map(e =>
         if (!isFridayShift && regularShiftsThisWeek === 1) {
           const regularTypes = weekTypes.filter(t => !t.includes('שישי'));
           if (regularTypes.includes(shiftType)) {
-            if (isNufer) console.log(`נופר כבר עם משמרת ${shiftType} השבוע`);
+            if (isDebug) console.log(`${employee.full_name} כבר עם משמרת ${shiftType} השבוע`);
             return false; // כבר יש לו משמרת רגילה מהסוג הזה השבוע
           }
         }
 
-        if (isNufer && isFridayShift) console.log(`✅ נופר יכולה לקבל ${shiftType} ב-${dateStr}`);
+        if (isDebug) console.log(`✅ ${employee.full_name} יכול/ה לקבל ${shiftType} ב-${dateStr} (משמרות רגילות השבוע: ${regularShiftsThisWeek})`);
         return true;
       };
 

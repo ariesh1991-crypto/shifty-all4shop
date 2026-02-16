@@ -5,7 +5,7 @@ import { format, getMonth, getYear, getDay } from 'date-fns';
 import { ChevronLeft, ChevronRight, LogOut, Calendar, Briefcase, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
-import NotificationBell from '../components/notifications/NotificationBell';
+
 
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -363,7 +363,6 @@ export default function EmployeeConstraints() {
         <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
           <h1 className="text-3xl font-bold">{currentEmployee.full_name} - אילוצים והעדפות</h1>
           <div className="flex gap-2 flex-wrap">
-            {currentUser && <NotificationBell userId={currentUser.id} />}
             <Link to={createPageUrl('EmployeeShifts')}>
               <Button variant="outline">
                 <ChevronRight className="w-4 h-4 ml-1" />

@@ -413,35 +413,135 @@ export default function ManagerDashboard() {
 
   const analyzeConflictsWithAI = async (unassignedShifts, alerts, employeeStats, allData) => {
     try {
-      const prompt = `אתה מומחה לניהול משמרות עובדים. נתון לך מצב סידור משמרות עם קונפליקטים.
+      const employeeList = Object.values(employeeStats).map(s => ({
+        name: s.employee.full_name,
+        totalShifts: s.totalShifts,
+        fridayCount: s.fridayCount,
+        thursdayCount: s.thursdayCount,
+        availability: s.employee.blocked_days || []
+      }));
+
+      const prompt = `אתה מומחה AI לניהול משמרות עובדים. נתון לך מצב סידור משמרות עם קונפליקטים.
+אתה צריך לספק ניתוח מעמיק והמלצות קונקרטיות וניתנות ליישום מיידי.
 
 **נתונים:**
 - משמרות שלא שובצו: ${unassignedShifts.length} משמרות
-${unassignedShifts.slice(0, 10).map(s => `  • ${s.date} - ${s.type}`).join('\n')}
-${unassignedShifts.length > 10 ? `  • ... ועוד ${unassignedShifts.length - 10}` : ''}
+${unassignedShifts.slice(0, 15).map(s => `  • ${s.date} - ${s.type}`).join('\n')}
+${unassignedShifts.length > 15 ? `  • ... ועוד ${unassignedShifts.length - 15}` : ''}
 
 - התראות קונפליקטים: ${alerts.length} התראות
-${alerts.slice(0, 5).map(a => `  • ${a.employeeName} - ${a.date}: ${a.message}`).join('\n')}
-${alerts.length > 5 ? `  • ... ועוד ${alerts.length - 5}` : ''}
+${alerts.slice(0, 8).map(a => `  • ${a.employeeName} - ${a.date}: ${a.message}`).join('\n')}
+${alerts.length > 8 ? `  • ... ועוד ${alerts.length - 8}` : ''}
 
-- סטטיסטיקות עובדים:
-${Object.values(employeeStats).slice(0, 5).map(s => 
-  `  • ${s.employee.full_name}: ${s.totalShifts} משמרות, ${s.fridayCount} שישי`
+- סטטיסטיקות עובדים מלאות:
+${employeeList.slice(0, 10).map(e => 
+  `  • ${e.name}: ${e.totalShifts} משמרות סה"כ, ${e.fridayCount} שישי, ${e.thursdayCount} חמישי`
 ).join('\n')}
 
 - אילוצים פעילים: ${allData.constraints.length}
 - חופשות מאושרות: ${allData.approvedVacations.length}
+- מספר עובדים כולל: ${allData.employees.length}
 
-**משימה:**
-1. נתח את הקונפליקטים לפי חומרה (קריטי/בינוני/נמוך)
-2. הצע פתרונות קונקרטיים:
-   - החלפות משמרות בין עובדים
-   - עובדים שיכולים לקבל עוד משמרות
-   - שינויים בהגדרות שיפתרו בעיות
-3. סמן קונפליקטים שלא ניתנים לפתרון
-4. הצע סדר עדיפויות לטיפול
+**משימה מעמיקה:**
+1. נתח את הקונפליקטים לפי חומרה (קריטי/בינוני/נמוך) - תן דגש על קונפליקטים קריטיים
+2. **פתרונות קונקרטיים וניתנים ליישום מיידי:**
+   - החלפות משמרות ספציפיות: מי עם מי, באיזה תאריך
+   - רשימת עובדים זמינים למשמרות לא משובצות (לפי סדר עדיפות)
+   - שינויים קונקרטיים בהגדרות או אילוצים
+   - אפשרות לשנות סוג משמרת (למשל, קצרה לארוכה) אם זה פותר בעיה
+3. **גם לבעיות "בלתי פתירות" - הצע פתרונות חלופיים:**
+   - אולי להרחיב את מגבלת השבוע זמנית
+   - לבקש מעובד לוותר על העדפה
+   - להביא עובד זמני
+   - לשנות מבנה משמרת
+4. הצע סדר עדיפויות ברור לטיפול - מה קריטי, מה יכול לחכות
+5. תעדוף עובדים זמינים למשמרות לא משובצות לפי הניקוד והזמינות
 
-**חשוב:** התשובה חייבת להיות מעשית ומבוססת על הנתונים שסופקו.`;
+**חשוב מאוד:** 
+- כל המלצה חייבת להיות ספציפית וניתנת ליישום
+- אל תגיד "צריך למצוא עובד" - תציין אילו עובדים מתאימים
+- אל תגיד "לשנות הגדרות" - תציין אילו הגדרות בדיוק
+- תן פתרונות גם ל"בעיות בלתי פתירות" - תמיד יש מה לעשות!`;
+
+      const result = await base44.integrations.Core.InvokeLLM({
+        prompt,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            summary: {
+              type: "object",
+              properties: {
+                total_conflicts: { type: "number" },
+                critical_conflicts: { type: "number" },
+                resolvable_conflicts: { type: "number" },
+                unresolvable_conflicts: { type: "number" }
+              }
+            },
+            priority_conflicts: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  type: { type: "string" },
+                  severity: { type: "string" },
+                  description: { type: "string" },
+                  affected_dates: { type: "array", items: { type: "string" } },
+                  affected_employees: { type: "array", items: { type: "string" } }
+                }
+              }
+            },
+            suggested_solutions: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  solution_type: { type: "string" },
+                  title: { type: "string" },
+                  description: { type: "string" },
+                  specific_action: { type: "string" },
+                  expected_impact: { type: "string" },
+                  difficulty: { type: "string" }
+                }
+              }
+            },
+            available_employees_for_unassigned: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  shift_date: { type: "string" },
+                  shift_type: { type: "string" },
+                  recommended_employees: { 
+                    type: "array", 
+                    items: {
+                      type: "object",
+                      properties: {
+                        name: { type: "string" },
+                        priority: { type: "number" },
+                        reason: { type: "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            alternative_solutions: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  issue: { type: "string" },
+                  original_constraint: { type: "string" },
+                  suggested_workaround: { type: "string" },
+                  pros: { type: "string" },
+                  cons: { type: "string" }
+                }
+              }
+            },
+            overall_assessment: { type: "string" }
+          }
+        }
+      });
 
       const result = await base44.integrations.Core.InvokeLLM({
         prompt,
@@ -1330,6 +1430,11 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
           setAiSuggestionsDialogOpen(true);
         }
       }
+      
+      // שמור את ההתראות גם אם AI לא הופעל
+      if (aiSuggestions) {
+        setAiSuggestionsDialogOpen(true);
+      }
 
       // שלח מיילים לעובדים עם חריגות
       const uniqueEmployees = [...new Set(alerts.map(a => a.employeeId))];
@@ -1581,6 +1686,17 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
           <div className="flex gap-3 flex-wrap">
             {currentUser && <NotificationBell userId={currentUser.id} />}
             <RealTimeAlertsPanel isManager={true} />
+            
+            {aiSuggestions && (
+              <Button 
+                onClick={() => setAiSuggestionsDialogOpen(true)} 
+                variant="outline"
+                className="bg-purple-50 border-purple-300 hover:bg-purple-100"
+              >
+                <Sparkles className="w-4 h-4 ml-2 text-purple-600" />
+                הצג התראות AI
+              </Button>
+            )}
 
             <Link to={createPageUrl('VacationManagement')}>
               <Button variant="outline">
@@ -1651,6 +1767,46 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
             >
               <Sparkles className="w-4 h-4 ml-2" />
               {generating ? 'יוצר...' : 'צור סקיצת משמרות'}
+            </Button>
+            <Button
+              onClick={async () => {
+                try {
+                  // שלח תזכורות למשמרות של מחר
+                  const tomorrow = new Date();
+                  tomorrow.setDate(tomorrow.getDate() + 1);
+                  const tomorrowStr = format(tomorrow, 'yyyy-MM-dd');
+                  
+                  const tomorrowShifts = allShifts.filter(s => s.date === tomorrowStr && s.assigned_employee_id);
+                  
+                  if (tomorrowShifts.length === 0) {
+                    toast({ title: 'אין משמרות למחר' });
+                    return;
+                  }
+                  
+                  for (const shift of tomorrowShifts) {
+                    const employee = employees.find(e => e.id === shift.assigned_employee_id);
+                    if (employee?.user_id) {
+                      const users = await base44.entities.User.list();
+                      const user = users.find(u => u.id === employee.user_id);
+                      if (user?.email) {
+                        await base44.integrations.Core.SendEmail({
+                          to: user.email,
+                          subject: 'תזכורת: משמרת מחר',
+                          body: `שלום ${employee.full_name},\n\nזוהי תזכורת שיש לך משמרת מחר:\n\n📅 תאריך: ${format(tomorrow, 'dd/MM/yyyy')}\n⏰ סוג משמרת: ${shift.shift_type}\n🕐 שעות: ${shift.start_time} - ${shift.end_time}\n\nנתראה!\n\nמערכת ניהול משמרות`
+                        });
+                      }
+                    }
+                  }
+                  
+                  toast({ title: `נשלחו ${tomorrowShifts.length} תזכורות למשמרות של מחר` });
+                } catch (error) {
+                  console.error('Error sending reminders:', error);
+                  toast({ title: 'שגיאה בשליחת תזכורות', variant: 'destructive' });
+                }
+              }}
+              variant="outline"
+            >
+              ✉️ שלח תזכורות למחר
             </Button>
             <Button 
               onClick={() => window.print()}
@@ -1991,6 +2147,12 @@ function AISuggestionsView({ suggestions }) {
                     <p className="text-sm text-blue-800 mb-2">
                       {solution.description}
                     </p>
+                    {solution.specific_action && (
+                      <div className="bg-white p-2 rounded border border-blue-200 mb-2">
+                        <strong className="text-xs text-blue-900">פעולה ספציפית:</strong>
+                        <p className="text-xs text-blue-800 mt-1">{solution.specific_action}</p>
+                      </div>
+                    )}
                     <div className="flex gap-4 text-xs">
                       <div>
                         <strong>השפעה צפויה:</strong> {solution.expected_impact}
@@ -2007,27 +2169,73 @@ function AISuggestionsView({ suggestions }) {
         </div>
       )}
 
-      {/* בעיות שלא ניתן לפתור */}
-      {suggestions.unresolvable_issues && suggestions.unresolvable_issues.length > 0 && (
+      {/* עובדים זמינים למשמרות לא משובצות */}
+      {suggestions.available_employees_for_unassigned && suggestions.available_employees_for_unassigned.length > 0 && (
         <div>
           <h3 className="font-bold text-lg mb-3 flex items-center gap-2">
-            ⚠️ בעיות שדורשות התערבות ידנית
+            👥 עובדים מומלצים למשמרות לא משובצות
           </h3>
           <div className="space-y-3">
-            {suggestions.unresolvable_issues.map((issue, idx) => (
-              <div key={idx} className="bg-amber-50 border-2 border-amber-400 rounded-lg p-4">
-                <div className="font-bold text-amber-900 mb-2">{issue.issue}</div>
-                <div className="text-sm text-amber-800 mb-2">
-                  <strong>סיבה:</strong> {issue.reason}
+            {suggestions.available_employees_for_unassigned.map((item, idx) => (
+              <div key={idx} className="bg-green-50 border-2 border-green-300 rounded-lg p-4">
+                <div className="font-bold text-green-900 mb-2">
+                  📅 {item.shift_date} - {item.shift_type}
                 </div>
-                <div className="text-sm text-amber-700 bg-white p-2 rounded">
-                  <strong>המלצה:</strong> {issue.recommendation}
+                {item.recommended_employees && item.recommended_employees.length > 0 ? (
+                  <div className="space-y-2">
+                    {item.recommended_employees.map((emp, i) => (
+                      <div key={i} className="flex items-center gap-2 bg-white p-2 rounded">
+                        <Badge variant="outline" className="text-xs">
+                          #{emp.priority}
+                        </Badge>
+                        <span className="font-medium">{emp.name}</span>
+                        <span className="text-xs text-gray-600">- {emp.reason}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-600">אין עובדים זמינים</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* פתרונות חלופיים */}
+      {suggestions.alternative_solutions && suggestions.alternative_solutions.length > 0 && (
+        <div>
+          <h3 className="font-bold text-lg mb-3 flex items-center gap-2">
+            🔄 פתרונות חלופיים לבעיות מורכבות
+          </h3>
+          <div className="space-y-3">
+            {suggestions.alternative_solutions.map((alt, idx) => (
+              <div key={idx} className="bg-amber-50 border-2 border-amber-300 rounded-lg p-4">
+                <div className="font-bold text-amber-900 mb-2">{alt.issue}</div>
+                <div className="text-sm mb-2">
+                  <strong className="text-amber-800">מגבלה מקורית:</strong> {alt.original_constraint}
+                </div>
+                <div className="bg-white p-3 rounded mb-2">
+                  <strong className="text-sm text-amber-900">פתרון מוצע:</strong>
+                  <p className="text-sm text-gray-700 mt-1">{alt.suggested_workaround}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-green-100 p-2 rounded">
+                    <strong className="text-green-800">יתרונות:</strong>
+                    <p className="text-green-700 mt-1">{alt.pros}</p>
+                  </div>
+                  <div className="bg-red-100 p-2 rounded">
+                    <strong className="text-red-800">חסרונות:</strong>
+                    <p className="text-red-700 mt-1">{alt.cons}</p>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         </div>
       )}
+
+
 
       <div className="bg-gray-50 border rounded-lg p-4 text-center">
         <p className="text-sm text-gray-600">

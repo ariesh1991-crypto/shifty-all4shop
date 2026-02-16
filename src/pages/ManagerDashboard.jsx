@@ -1689,9 +1689,6 @@ ${employeeList.slice(0, 10).map(e =>
           <h1 className="text-3xl font-bold">לוח משמרות</h1>
           
           <div className="flex gap-3 flex-wrap">
-            {currentUser && <NotificationBell userId={currentUser.id} />}
-            <RealTimeAlertsPanel isManager={true} />
-            
             {aiSuggestions && (
               <Button 
                 onClick={() => setAiSuggestionsDialogOpen(true)} 

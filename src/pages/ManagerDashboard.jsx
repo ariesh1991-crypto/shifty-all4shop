@@ -1083,17 +1083,25 @@ ${employeeList.slice(0, 10).map(e =>
         if (candidates.length === 0 && allowRelaxedRules) {
           console.log(`🔄 ניסיון עם כללים מורפים עבור ${shiftType} ב-${dateStr}`);
           
-          // נסה להרפות רק את מגבלות השבוע (לא זמינות/חופשות)
+          // נסה להרפות רק את רוטציית חמישי - לא את מגבלת 2 משמרות בשבוע!
           candidates = activeEmployees.filter(emp => {
             const stats = employeeStats[emp.id];
             const empId = emp.id;
+            const dayOfWeek = getDay(date);
+            const isThursday = dayOfWeek === 4;
+            const weekNum = getWeekNum(date);
+            const weekTypes = stats.weeklyShiftTypes[weekNum] || [];
+            const regularShiftsThisWeek = weekTypes.filter(t => !t.includes('שישי')).length;
             
-            // בדוק רק זמינות בסיסית
+            // בדוק זמינות בסיסית - אלה אי אפשר להרפות
             if (stats.assignedDates.has(dateStr)) return false;
             if (!isEmployeeAvailable(empId, dateStr)) return false;
             if (emp.blocked_shift_times?.includes(shiftType)) return false;
             
-            // הרפה את מגבלות השבוע/חודש במקרה חירום
+            // אל תרפה את מגבלת 2 משמרות רגילות בשבוע!!!
+            if (!isFridayShift && regularShiftsThisWeek >= 2) return false;
+            
+            // אפשר להרפות רק רוטציית חמישי (במקרה חירום)
             return true;
           });
         }

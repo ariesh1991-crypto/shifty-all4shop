@@ -136,9 +136,12 @@ export default function EmployeeShiftsReport() {
                 <SelectContent>
                   {availableMonths.map(month => {
                     const monthKey = format(month, 'yyyy-MM');
+                    const monthNames = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
+                    const monthName = monthNames[month.getMonth()];
+                    const year = month.getFullYear();
                     return (
                       <SelectItem key={monthKey} value={monthKey}>
-                        {format(month, 'MMMM yyyy', { locale: 'he' })}
+                        {monthName} {year}
                       </SelectItem>
                     );
                   })}

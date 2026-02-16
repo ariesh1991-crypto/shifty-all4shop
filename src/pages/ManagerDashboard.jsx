@@ -632,7 +632,9 @@ ${employeeList.slice(0, 10).map(e =>
         const employee = stats.employee;
         const weekNum = getWeekNum(date);
         const dateStr = format(date, 'yyyy-MM-dd');
+        const dayOfWeek = getDay(date);
         const isFridayShift = shiftType.includes('שישי');
+        const isThursday = dayOfWeek === 4;
         
         // דיבאג לנופר
         const isNufer = employee.full_name === 'נופר';
@@ -653,6 +655,49 @@ ${employeeList.slice(0, 10).map(e =>
         if (employee.blocked_shift_times && employee.blocked_shift_times.includes(shiftType)) {
           if (isNufer) console.log(`נופר חסומה ממשמרת ${shiftType}`);
           return false;
+        }
+
+        // חוק רוטציה חמישי קשיח - אל תיתן עובד שכבר עבד משמרת מהסוג הזה בחמישי
+        // עד שכל העובדים האחרים עברו את הסבב
+        if (isThursday) {
+          const allEmployeesThursdayCounts = activeEmployees.map(emp => 
+            employeeStats[emp.id].thursdayCount
+          );
+          const minThursdayCount = Math.min(...allEmployeesThursdayCounts);
+          const maxThursdayCount = Math.max(...allEmployeesThursdayCounts);
+          
+          // אם העובד הזה עבד יותר חמישי מהמינימום, חסום אותו
+          if (stats.thursdayCount > minThursdayCount) {
+            if (isNufer) console.log(`נופר כבר עם ${stats.thursdayCount} חמישיים, מינימום הוא ${minThursdayCount}`);
+            return false;
+          }
+          
+          // אם העובד עבד את הסוג הזה של משמרת בחמישי - חסום אותו
+          if (shiftType === 'מסיים ב-19:00' && stats.thursdayLongCount > 0) {
+            // מצא מי עוד זמין שלא עבד משמרת ארוכה בחמישי
+            const othersWithNoLongThursday = activeEmployees.filter(emp => 
+              employeeStats[emp.id].thursdayLongCount === 0 && 
+              emp.id !== empId
+            ).length;
+            
+            if (othersWithNoLongThursday > 0) {
+              if (isNufer) console.log(`נופר כבר עשתה חמישי ארוך, יש ${othersWithNoLongThursday} אחרים שלא`);
+              return false;
+            }
+          }
+          
+          if (shiftType === 'מסיים ב-17:30' && stats.thursdayShortCount > 0) {
+            // מצא מי עוד זמין שלא עבד משמרת קצרה בחמישי
+            const othersWithNoShortThursday = activeEmployees.filter(emp => 
+              employeeStats[emp.id].thursdayShortCount === 0 && 
+              emp.id !== empId
+            ).length;
+            
+            if (othersWithNoShortThursday > 0) {
+              if (isNufer) console.log(`נופר כבר עשתה חמישי קצר, יש ${othersWithNoShortThursday} אחרים שלא`);
+              return false;
+            }
+          }
         }
 
         // חוק חשוב: מי שעשה ארוכה בחמישי לא יעבוד שישי ארוך

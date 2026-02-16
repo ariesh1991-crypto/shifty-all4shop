@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, LogOut, Calendar, Briefcase, Users } from 'l
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import NotificationBell from '../components/notifications/NotificationBell';
-import UpcomingVacationAlerts from '../components/notifications/UpcomingVacationAlerts';
+
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -417,26 +417,7 @@ export default function EmployeeConstraints() {
           </div>
         </div>
 
-        {pendingVacations.length > 0 && (
-          <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4 mb-6">
-            <h3 className="font-bold text-yellow-800 mb-2">
-              ⏳ יש לך {pendingVacations.length} בקשות חופשה ממתינות לאישור
-            </h3>
-            <div className="space-y-2">
-              {pendingVacations.map(v => {
-                const start = new Date(v.start_date + 'T00:00:00');
-                const end = new Date(v.end_date + 'T00:00:00');
-                return (
-                  <div key={v.id} className="text-sm text-yellow-700">
-                    • {v.type}: {format(start, 'dd/MM/yyyy')} - {format(end, 'dd/MM/yyyy')}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
-        <UpcomingVacationAlerts employeeId={currentEmployee.id} />
 
         {recurringConstraints.length > 0 && (
           <div className="bg-orange-50 border-2 border-orange-400 rounded-lg p-4 mb-6">

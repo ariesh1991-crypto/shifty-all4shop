@@ -542,6 +542,9 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
           fridayCount: 0,
           fridayLongCount: 0, // ספירת שישי ארוך
           fridayShortCount: 0, // ספירת שישי קצר
+          thursdayCount: 0, // ספירת משמרות חמישי
+          thursdayLongCount: 0, // ספירת משמרות ארוכות בחמישי
+          thursdayShortCount: 0, // ספירת משמרות קצרות בחמישי
           totalShifts: 0,
         };
       });
@@ -671,7 +674,9 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
         const stats = employeeStats[empId];
         const weekNum = getWeekNum(date);
         const dateStr = format(date, 'yyyy-MM-dd');
+        const dayOfWeek = getDay(date);
         const isFridayShift = shiftType.includes('שישי');
+        const isThursday = dayOfWeek === 4;
 
         stats.assignedDates.add(dateStr);
         stats.weeklyShifts[weekNum] = (stats.weeklyShifts[weekNum] || 0) + 1;
@@ -686,6 +691,13 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
           stats.fridayCount += 1;
           if (shiftType === 'שישי ארוך') stats.fridayLongCount += 1;
           if (shiftType === 'שישי קצר') stats.fridayShortCount += 1;
+        }
+        
+        // מעקב חמישי
+        if (isThursday) {
+          stats.thursdayCount += 1;
+          if (shiftType === 'מסיים ב-19:00') stats.thursdayLongCount += 1;
+          if (shiftType === 'מסיים ב-17:30') stats.thursdayShortCount += 1;
         }
       };
 
@@ -888,6 +900,7 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
         const dateStr = format(date, 'yyyy-MM-dd');
         const dayOfWeek = getDay(date);
         const isFridayShift = shiftType.includes('שישי');
+        const isThursday = dayOfWeek === 4;
         let score = 2000; // בסיס גבוה
 
         // הוגנות - משקל עליון! זה החשוב ביותר
@@ -902,6 +915,19 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
         if (shiftType === 'מסיים ב-17:30') {
           const morningCount = Object.values(stats.weeklyShiftTypes).flat().filter(t => t === 'מסיים ב-17:30').length;
           score -= morningCount * 80;
+        }
+        
+        // רוטציה ימי חמישי - עדיף עובד עם פחות משמרות חמישי
+        if (isThursday) {
+          score -= stats.thursdayCount * 150; // משקל גבוה לרוטציה
+          
+          // עדיף עובד שלא עשה את סוג המשמרת הזו בחמישי
+          if (shiftType === 'מסיים ב-19:00' && stats.thursdayLongCount > 0) {
+            score -= stats.thursdayLongCount * 200;
+          }
+          if (shiftType === 'מסיים ב-17:30' && stats.thursdayShortCount > 0) {
+            score -= stats.thursdayShortCount * 200;
+          }
         }
         
         // עובד ללא משמרות שישי בכלל - בונוס גדול

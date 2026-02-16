@@ -13,7 +13,8 @@ export default function Home() {
       try {
         const user = await base44.auth.me();
         
-        if (user.role === 'admin') {
+        // בדוק אם המשתמש הוא המנהל הראשי לפי מייל
+        if (user.role === 'admin' || user.email === 'ariesh1991@gmail.com') {
           navigate(createPageUrl('ManagerDashboard'));
         } else {
           navigate(createPageUrl('EmployeeConstraints'));

@@ -336,7 +336,7 @@ export default function EmployeeConstraints() {
   }
 
   if (!currentEmployee) {
-    if (currentUser?.role === 'admin') {
+    if (currentUser?.role === 'admin' || currentUser?.email === 'ariesh1991@gmail.com') {
       window.location.href = '/ManagerDashboard';
       return <div className="min-h-screen flex items-center justify-center" dir="rtl">מעביר אותך ללוח בקרה...</div>;
     }

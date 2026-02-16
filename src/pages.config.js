@@ -47,13 +47,11 @@
  *
  * The mainPage value must match a key in the PAGES object exactly.
  */
-import AdvancedPlanningTools from './pages/AdvancedPlanningTools';
 import AllConstraints from './pages/AllConstraints';
 import EmployeeConstraints from './pages/EmployeeConstraints';
 import EmployeeDashboard from './pages/EmployeeDashboard';
 import EmployeePreferences from './pages/EmployeePreferences';
 import EmployeeShifts from './pages/EmployeeShifts';
-import EmployeeShiftsReport from './pages/EmployeeShiftsReport';
 import EmployeeSwaps from './pages/EmployeeSwaps';
 import Home from './pages/Home';
 import ManageEmployees from './pages/ManageEmployees';
@@ -64,13 +62,11 @@ import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
-    "AdvancedPlanningTools": AdvancedPlanningTools,
     "AllConstraints": AllConstraints,
     "EmployeeConstraints": EmployeeConstraints,
     "EmployeeDashboard": EmployeeDashboard,
     "EmployeePreferences": EmployeePreferences,
     "EmployeeShifts": EmployeeShifts,
-    "EmployeeShiftsReport": EmployeeShiftsReport,
     "EmployeeSwaps": EmployeeSwaps,
     "Home": Home,
     "ManageEmployees": ManageEmployees,

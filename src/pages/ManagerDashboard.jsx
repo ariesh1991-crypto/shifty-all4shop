@@ -1757,46 +1757,7 @@ ${employeeList.slice(0, 10).map(e =>
               <Sparkles className="w-4 h-4 ml-2" />
               {generating ? 'יוצר...' : 'צור סקיצת משמרות'}
             </Button>
-            <Button
-              onClick={async () => {
-                try {
-                  // שלח תזכורות למשמרות של מחר
-                  const tomorrow = new Date();
-                  tomorrow.setDate(tomorrow.getDate() + 1);
-                  const tomorrowStr = format(tomorrow, 'yyyy-MM-dd');
-                  
-                  const tomorrowShifts = allShifts.filter(s => s.date === tomorrowStr && s.assigned_employee_id);
-                  
-                  if (tomorrowShifts.length === 0) {
-                    toast({ title: 'אין משמרות למחר' });
-                    return;
-                  }
-                  
-                  for (const shift of tomorrowShifts) {
-                    const employee = employees.find(e => e.id === shift.assigned_employee_id);
-                    if (employee?.user_id) {
-                      const users = await base44.entities.User.list();
-                      const user = users.find(u => u.id === employee.user_id);
-                      if (user?.email) {
-                        await base44.integrations.Core.SendEmail({
-                          to: user.email,
-                          subject: 'תזכורת: משמרת מחר',
-                          body: `שלום ${employee.full_name},\n\nזוהי תזכורת שיש לך משמרת מחר:\n\n📅 תאריך: ${format(tomorrow, 'dd/MM/yyyy')}\n⏰ סוג משמרת: ${shift.shift_type}\n🕐 שעות: ${shift.start_time} - ${shift.end_time}\n\nנתראה!\n\nמערכת ניהול משמרות`
-                        });
-                      }
-                    }
-                  }
-                  
-                  toast({ title: `נשלחו ${tomorrowShifts.length} תזכורות למשמרות של מחר` });
-                } catch (error) {
-                  console.error('Error sending reminders:', error);
-                  toast({ title: 'שגיאה בשליחת תזכורות', variant: 'destructive' });
-                }
-              }}
-              variant="outline"
-            >
-              ✉️ שלח תזכורות למחר
-            </Button>
+
             <Button 
               onClick={() => window.print()}
               variant="outline"

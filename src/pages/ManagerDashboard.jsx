@@ -761,11 +761,19 @@ ${employeeList.slice(0, 10).map(e =>
       // פונקציה לשבץ משמרת
       const assignShift = (empId, date, shiftType) => {
         const stats = employeeStats[empId];
+        const employee = stats.employee;
         const weekNum = getWeekNum(date);
         const dateStr = format(date, 'yyyy-MM-dd');
         const dayOfWeek = getDay(date);
         const isFridayShift = shiftType.includes('שישי');
         const isThursday = dayOfWeek === 4;
+
+        // דיבאג מפורט לטל
+        if (employee.full_name === 'טל') {
+          console.log(`📌 טל מקבלת משמרת ${shiftType} ב-${dateStr}`);
+          console.log(`   לפני: totalShifts=${stats.totalShifts}, weeklyShifts[${weekNum}]=${stats.weeklyShifts[weekNum] || 0}`);
+          console.log(`   סוגי משמרות השבוע לפני: ${(stats.weeklyShiftTypes[weekNum] || []).join(', ')}`);
+        }
 
         stats.assignedDates.add(dateStr);
         stats.weeklyShifts[weekNum] = (stats.weeklyShifts[weekNum] || 0) + 1;
@@ -787,6 +795,14 @@ ${employeeList.slice(0, 10).map(e =>
           stats.thursdayCount += 1;
           if (shiftType === 'מסיים ב-19:00') stats.thursdayLongCount += 1;
           if (shiftType === 'מסיים ב-17:30') stats.thursdayShortCount += 1;
+        }
+
+        // דיבאג מפורט לטל - אחרי
+        if (employee.full_name === 'טל') {
+          console.log(`   אחרי: totalShifts=${stats.totalShifts}, weeklyShifts[${weekNum}]=${stats.weeklyShifts[weekNum]}`);
+          console.log(`   סוגי משמרות השבוע אחרי: ${stats.weeklyShiftTypes[weekNum].join(', ')}`);
+          const regularShifts = stats.weeklyShiftTypes[weekNum].filter(t => !t.includes('שישי')).length;
+          console.log(`   משמרות רגילות השבוע: ${regularShifts}`);
         }
       };
 

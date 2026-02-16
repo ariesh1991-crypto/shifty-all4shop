@@ -543,62 +543,6 @@ ${employeeList.slice(0, 10).map(e =>
         }
       });
 
-      const result = await base44.integrations.Core.InvokeLLM({
-        prompt,
-        response_json_schema: {
-          type: "object",
-          properties: {
-            summary: {
-              type: "object",
-              properties: {
-                total_conflicts: { type: "number" },
-                critical_conflicts: { type: "number" },
-                resolvable_conflicts: { type: "number" },
-                unresolvable_conflicts: { type: "number" }
-              }
-            },
-            priority_conflicts: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  type: { type: "string" },
-                  severity: { type: "string" },
-                  description: { type: "string" },
-                  affected_dates: { type: "array", items: { type: "string" } },
-                  affected_employees: { type: "array", items: { type: "string" } }
-                }
-              }
-            },
-            suggested_solutions: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  solution_type: { type: "string" },
-                  title: { type: "string" },
-                  description: { type: "string" },
-                  expected_impact: { type: "string" },
-                  difficulty: { type: "string" }
-                }
-              }
-            },
-            unresolvable_issues: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  issue: { type: "string" },
-                  reason: { type: "string" },
-                  recommendation: { type: "string" }
-                }
-              }
-            },
-            overall_assessment: { type: "string" }
-          }
-        }
-      });
-
       return result;
     } catch (error) {
       console.error('AI analysis failed:', error);

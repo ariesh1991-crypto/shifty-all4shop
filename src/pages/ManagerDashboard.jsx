@@ -1758,13 +1758,7 @@ ${employeeList.slice(0, 10).map(e =>
               {generating ? 'יוצר...' : 'צור סקיצת משמרות'}
             </Button>
 
-            <Button 
-              onClick={() => window.print()}
-              variant="outline"
-            >
-              <Download className="w-4 h-4 ml-2" />
-              הדפס לוח משמרות
-            </Button>
+
             <Button 
               onClick={() => approveScheduleMutation.mutate()}
               disabled={allShifts.filter(s => s.schedule_status === 'טיוטה').length === 0}

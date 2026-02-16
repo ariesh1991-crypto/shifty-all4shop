@@ -961,16 +961,16 @@ ${employeeList.slice(0, 10).map(e =>
           score -= morningCount * 80;
         }
         
-        // רוטציה ימי חמישי - עדיף עובד עם פחות משמרות חמישי
+        // רוטציה ימי חמישי - הגדלת משקל להבטחת רוטציה חזקה
         if (isThursday) {
-          score -= stats.thursdayCount * 150; // משקל גבוה לרוטציה
+          score -= stats.thursdayCount * 400; // משקל גבוה מאוד לרוטציה - הוגדל מ-150
           
           // עדיף עובד שלא עשה את סוג המשמרת הזו בחמישי
           if (shiftType === 'מסיים ב-19:00' && stats.thursdayLongCount > 0) {
-            score -= stats.thursdayLongCount * 200;
+            score -= stats.thursdayLongCount * 600; // הוגדל מ-200
           }
           if (shiftType === 'מסיים ב-17:30' && stats.thursdayShortCount > 0) {
-            score -= stats.thursdayShortCount * 200;
+            score -= stats.thursdayShortCount * 600; // הוגדל מ-200
           }
         }
         

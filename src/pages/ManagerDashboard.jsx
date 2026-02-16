@@ -1555,12 +1555,7 @@ ${Object.values(employeeStats).slice(0, 5).map(s =>
           <div className="flex gap-3 flex-wrap">
             {currentUser && <NotificationBell userId={currentUser.id} />}
             <RealTimeAlertsPanel isManager={true} />
-            <Link to={createPageUrl('ManagerDashboardHome')}>
-              <Button variant="outline">
-                <Home className="w-4 h-4 ml-2" />
-                לוח בקרה
-              </Button>
-            </Link>
+
             <Link to={createPageUrl('VacationManagement')}>
               <Button variant="outline">
                 <Briefcase className="w-4 h-4 ml-2" />

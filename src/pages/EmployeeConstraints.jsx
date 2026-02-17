@@ -261,10 +261,10 @@ export default function EmployeeConstraints() {
           approvedVacation ? 'bg-green-100 border-green-500' :
           recurringConstraint?.unavailable ? 'bg-orange-100 border-orange-500' :
           constraint?.unavailable ? 'bg-red-100 border-red-400' :
-          constraint?.preference === 'מעדיף לסיים ב-17:30' ? 'bg-blue-100 border-blue-400' :
-          constraint?.preference === 'מעדיף לסיים ב-19:00' ? 'bg-purple-100 border-purple-400' :
-          constraint?.preference === 'שישי קצר' ? 'bg-yellow-100 border-yellow-400' :
-          constraint?.preference === 'שישי ארוך' ? 'bg-orange-100 border-orange-400' :
+          constraint?.preference === 'מעדיף משמרת מסיים ב-17:30' ? 'bg-blue-100 border-blue-400' :
+          constraint?.preference === 'מעדיף משמרת מסיים ב-19:00' ? 'bg-purple-100 border-purple-400' :
+          constraint?.preference === 'מעדיף שישי קצר' ? 'bg-yellow-100 border-yellow-400' :
+          constraint?.preference === 'מעדיף שישי ארוך' ? 'bg-orange-100 border-orange-400' :
           'bg-white'
         }`}
       >
@@ -486,11 +486,11 @@ export default function EmployeeConstraints() {
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 rounded bg-blue-100 border-2 border-blue-400"></div>
-                  <span className="text-sm">מעדיף לסיים ב-17:30</span>
+                  <span className="text-sm">מעדיף משמרת עד 17:30</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 rounded bg-purple-100 border-2 border-purple-400"></div>
-                  <span className="text-sm">מעדיף לסיים ב-19:00</span>
+                  <span className="text-sm">מעדיף משמרת עד 19:00</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 rounded bg-yellow-100 border-2 border-yellow-400"></div>
@@ -711,13 +711,13 @@ function ConstraintForm({ selectedDate, existingConstraint, onSave, onDelete }) 
               <SelectItem value="none">ללא העדפה</SelectItem>
               {isFriday ? (
                 <>
-                  <SelectItem value="שישי קצר">שישי קצר (08:30-12:00)</SelectItem>
-                  <SelectItem value="שישי ארוך">שישי ארוך (08:00-14:00)</SelectItem>
+                  <SelectItem value="מעדיף שישי קצר">מעדיף שישי קצר (08:30-12:00)</SelectItem>
+                  <SelectItem value="מעדיף שישי ארוך">מעדיף שישי ארוך (08:00-14:00)</SelectItem>
                 </>
               ) : (
                 <>
-                  <SelectItem value="מעדיף לסיים ב-17:30">מעדיף לסיים ב-17:30</SelectItem>
-                  <SelectItem value="מעדיף לסיים ב-19:00">מעדיף לסיים ב-19:00</SelectItem>
+                  <SelectItem value="מעדיף משמרת מסיים ב-17:30">מעדיף משמרת מסיים ב-17:30</SelectItem>
+                  <SelectItem value="מעדיף משמרת מסיים ב-19:00">מעדיף משמרת מסיים ב-19:00</SelectItem>
                 </>
               )}
             </SelectContent>

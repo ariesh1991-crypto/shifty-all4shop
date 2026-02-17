@@ -4,18 +4,25 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, getMonth, getYear, startOfMonth, endOfMonth, eachDayOfInterval, getDay } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChevronLeft, ChevronRight, ArrowRight, Trash2, Filter, List } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ArrowRight, Trash2, Filter, List, Plus, Edit } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
 import MonthCalendar from '../components/shifts/MonthCalendar';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 
 export default function AllConstraints() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [filterEmployee, setFilterEmployee] = useState('all');
   const [filterType, setFilterType] = useState('all');
   const [viewMode, setViewMode] = useState('calendar'); // 'calendar' או 'list'
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingConstraint, setEditingConstraint] = useState(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -58,6 +65,26 @@ export default function AllConstraints() {
     onSuccess: () => {
       queryClient.invalidateQueries(['constraints']);
       toast({ title: 'אילוץ נמחק בהצלחה' });
+    },
+  });
+
+  const createConstraintMutation = useMutation({
+    mutationFn: (data) => base44.entities.Constraint.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['constraints']);
+      toast({ title: 'אילוץ נוסף בהצלחה' });
+      setDialogOpen(false);
+      setEditingConstraint(null);
+    },
+  });
+
+  const updateConstraintMutation = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.Constraint.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['constraints']);
+      toast({ title: 'אילוץ עודכן בהצלחה' });
+      setDialogOpen(false);
+      setEditingConstraint(null);
     },
   });
 
@@ -181,6 +208,10 @@ export default function AllConstraints() {
         <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
           <h1 className="text-3xl font-bold">כל האילוצים וההעדפות</h1>
           <div className="flex gap-2 flex-wrap">
+            <Button onClick={() => { setEditingConstraint(null); setDialogOpen(true); }} variant="default">
+              <Plus className="w-4 h-4 ml-2" />
+              הוסף אילוץ
+            </Button>
             <Link to={createPageUrl('ManagerDashboard')}>
               <Button variant="outline">
                 <ArrowRight className="w-4 h-4 ml-2" />
@@ -309,24 +340,166 @@ export default function AllConstraints() {
                         </div>
                       )}
                     </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        if (confirm('האם למחוק אילוץ זה?')) {
-                          deleteConstraintMutation.mutate(constraint.id);
-                        }
-                      }}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setEditingConstraint(constraint);
+                          setDialogOpen(true);
+                        }}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          if (confirm('האם למחוק אילוץ זה?')) {
+                            deleteConstraintMutation.mutate(constraint.id);
+                          }
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
         )}
+
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent dir="rtl" className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>{editingConstraint ? 'ערוך אילוץ' : 'הוסף אילוץ חדש'}</DialogTitle>
+            </DialogHeader>
+            <ConstraintEditForm
+              constraint={editingConstraint}
+              employees={employees}
+              onSave={(data) => {
+                if (editingConstraint) {
+                  updateConstraintMutation.mutate({ id: editingConstraint.id, data });
+                } else {
+                  createConstraintMutation.mutate(data);
+                }
+              }}
+              onCancel={() => {
+                setDialogOpen(false);
+                setEditingConstraint(null);
+              }}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
+  );
+}
+
+function ConstraintEditForm({ constraint, employees, onSave, onCancel }) {
+  const [employeeId, setEmployeeId] = useState(constraint?.employee_id || '');
+  const [date, setDate] = useState(constraint?.date || '');
+  const [unavailable, setUnavailable] = useState(constraint?.unavailable || false);
+  const [preference, setPreference] = useState(constraint?.preference || '');
+  const [notes, setNotes] = useState(constraint?.notes || '');
+
+  const selectedDate = date ? new Date(date) : null;
+  const dayOfWeek = selectedDate ? getDay(selectedDate) : null;
+  const isFriday = dayOfWeek === 5;
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!employeeId || !date) {
+      alert('יש למלא עובד ותאריך');
+      return;
+    }
+    onSave({ employee_id: employeeId, date, unavailable, preference: unavailable ? '' : preference, notes });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <Label>עובד</Label>
+        <Select value={employeeId} onValueChange={setEmployeeId} disabled={!!constraint}>
+          <SelectTrigger>
+            <SelectValue placeholder="בחר עובד..." />
+          </SelectTrigger>
+          <SelectContent>
+            {employees.filter(e => e.active).map(emp => (
+              <SelectItem key={emp.id} value={emp.id}>{emp.full_name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <Label>תאריך</Label>
+        <Input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          disabled={!!constraint}
+        />
+      </div>
+
+      <div className="bg-red-50 border-2 border-red-400 rounded-lg p-4">
+        <div className="flex items-center gap-3">
+          <Switch 
+            checked={unavailable} 
+            onCheckedChange={setUnavailable}
+            className="data-[state=checked]:bg-red-600"
+          />
+          <div className="flex-1">
+            <Label className="text-lg font-bold text-red-700">לא זמין</Label>
+            <p className="text-sm text-red-600 mt-1">סמן אם העובד לא זמין בתאריך זה</p>
+          </div>
+        </div>
+      </div>
+
+      {!unavailable && (
+        <div>
+          <Label>העדפת משמרת (אופציונלי)</Label>
+          <Select value={preference || 'none'} onValueChange={(val) => setPreference(val === 'none' ? '' : val)}>
+            <SelectTrigger>
+              <SelectValue placeholder="בחר העדפה..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">ללא העדפה</SelectItem>
+              {isFriday ? (
+                <>
+                  <SelectItem value="מעדיף שישי קצר">מעדיף שישי קצר</SelectItem>
+                  <SelectItem value="מעדיף שישי ארוך">מעדיף שישי ארוך</SelectItem>
+                </>
+              ) : (
+                <>
+                  <SelectItem value="מעדיף משמרת מסיים ב-17:30">מעדיף משמרת עד 17:30</SelectItem>
+                  <SelectItem value="מעדיף משמרת מסיים ב-19:00">מעדיף משמרת עד 19:00</SelectItem>
+                </>
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      <div>
+        <Label>הערות</Label>
+        <Textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="הערות נוספות..."
+          rows={3}
+        />
+      </div>
+
+      <div className="flex gap-3 justify-end">
+        <Button type="button" variant="outline" onClick={onCancel}>
+          ביטול
+        </Button>
+        <Button type="submit">
+          {constraint ? 'עדכן' : 'הוסף'}
+        </Button>
+      </div>
+    </form>
   );
 }

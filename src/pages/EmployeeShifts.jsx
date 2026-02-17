@@ -14,6 +14,7 @@ export default function EmployeeShifts() {
   const [currentEmployee, setCurrentEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
+  const [viewMode, setViewMode] = useState('my'); // 'my' או 'all'
 
   const year = getYear(currentDate);
   const month = getMonth(currentDate) + 1;
@@ -34,15 +35,48 @@ export default function EmployeeShifts() {
     loadEmployee();
   }, []);
 
+  const { data: employees = [] } = useQuery({
+    queryKey: ['employees'],
+    queryFn: () => base44.entities.Employee.list(),
+  });
+
   const { data: shifts = [] } = useQuery({
-    queryKey: ['shifts', currentEmployee?.id, monthKey],
+    queryKey: ['shifts', currentEmployee?.id, monthKey, viewMode],
     queryFn: async () => {
       if (!currentEmployee) return [];
       const allShifts = await base44.entities.Shift.list();
+      if (viewMode === 'all') {
+        return allShifts.filter(s => s.date && s.date.startsWith(monthKey));
+      }
       return allShifts.filter(s => s.assigned_employee_id === currentEmployee.id && s.date && s.date.startsWith(monthKey));
     },
     enabled: !!currentEmployee,
   });
+
+  const getEmployeeName = (empId) => {
+    const emp = employees.find(e => e.id === empId);
+    return emp?.full_name || 'לא משובץ';
+  };
+
+  const EMPLOYEE_COLORS = [
+    'bg-blue-200 border-blue-500',
+    'bg-purple-200 border-purple-500', 
+    'bg-pink-200 border-pink-500',
+    'bg-rose-200 border-rose-500',
+    'bg-fuchsia-200 border-fuchsia-500',
+    'bg-violet-200 border-violet-500',
+    'bg-cyan-200 border-cyan-500',
+    'bg-indigo-200 border-indigo-500',
+    'bg-sky-200 border-sky-500',
+    'bg-teal-200 border-teal-500',
+    'bg-lime-200 border-lime-500',
+    'bg-emerald-200 border-emerald-500',
+  ];
+
+  const getEmployeeColor = (employeeId) => {
+    const index = employees.findIndex(e => e.id === employeeId);
+    return EMPLOYEE_COLORS[index % EMPLOYEE_COLORS.length];
+  };
 
   const renderDay = (date) => {
     const dayOfWeek = getDay(date);
@@ -62,23 +96,39 @@ export default function EmployeeShifts() {
     return (
       <div
         key={date.toString()}
-        className={`p-3 border-2 rounded-lg min-h-[100px] ${dayShifts.length > 0 ? 'bg-white' : 'bg-gray-50'}`}
+        className={`p-2 border-2 rounded-lg min-h-[100px] ${dayShifts.length > 0 ? 'bg-white' : 'bg-gray-50'}`}
       >
         <div className="font-bold text-center mb-2">{dayNumber}</div>
         <div className="space-y-1">
-          {dayShifts.map((shift) => (
-            <div
-              key={shift.id}
-              className={`text-xs p-2 rounded border-2 ${SHIFT_COLORS[shift.shift_type]}`}
-            >
-              <div className="font-bold text-center">{shift.shift_type}</div>
-              {shift.start_time && shift.end_time && (
-                <div className="text-center text-[10px] text-gray-700 mt-1">
-                  {shift.start_time} - {shift.end_time}
-                </div>
-              )}
-            </div>
-          ))}
+          {dayShifts.map((shift) => {
+            const isMyShift = shift.assigned_employee_id === currentEmployee?.id;
+            const employeeColor = viewMode === 'all' && shift.assigned_employee_id 
+              ? getEmployeeColor(shift.assigned_employee_id)
+              : SHIFT_COLORS[shift.shift_type];
+            
+            return (
+              <div
+                key={shift.id}
+                className={`text-xs p-2 rounded border-2 ${employeeColor} ${
+                  isMyShift && viewMode === 'all' ? 'ring-2 ring-green-500' : ''
+                }`}
+              >
+                {viewMode === 'all' && (
+                  <div className={`font-bold text-center text-[10px] mb-1 ${
+                    isMyShift ? 'text-green-700' : 'text-gray-700'
+                  }`}>
+                    {isMyShift ? '✓ ' : ''}{getEmployeeName(shift.assigned_employee_id)}
+                  </div>
+                )}
+                <div className="font-bold text-center">{shift.shift_type}</div>
+                {shift.start_time && shift.end_time && (
+                  <div className="text-center text-[10px] text-gray-700 mt-1">
+                    {shift.start_time} - {shift.end_time}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -103,18 +153,36 @@ export default function EmployeeShifts() {
     );
   }
 
-  const totalShifts = shifts.length;
-  const shortShifts = shifts.filter(s => s.shift_type === 'מסיים ב-17:30').length;
-  const longShifts = shifts.filter(s => s.shift_type === 'מסיים ב-19:00').length;
-  const fridayShifts = shifts.filter(s => s.shift_type.includes('שישי')).length;
+  const myShifts = viewMode === 'all' 
+    ? shifts.filter(s => s.assigned_employee_id === currentEmployee.id)
+    : shifts;
+  
+  const totalShifts = myShifts.length;
+  const shortShifts = myShifts.filter(s => s.shift_type === 'מסיים ב-17:30').length;
+  const longShifts = myShifts.filter(s => s.shift_type === 'מסיים ב-19:00').length;
+  const fridayShifts = myShifts.filter(s => s.shift_type.includes('שישי')).length;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-teal-50 p-6" dir="rtl">
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
-          <h1 className="text-3xl font-bold">{currentEmployee.full_name} - המשמרות שלי</h1>
+          <h1 className="text-3xl font-bold">
+            {currentEmployee.full_name} - {viewMode === 'my' ? 'המשמרות שלי' : 'כל המשמרות'}
+          </h1>
           <div className="flex gap-2 flex-wrap">
             {currentUser && <NotificationBell userId={currentUser.id} />}
+            <Button 
+              variant={viewMode === 'my' ? 'default' : 'outline'}
+              onClick={() => setViewMode('my')}
+            >
+              המשמרות שלי
+            </Button>
+            <Button 
+              variant={viewMode === 'all' ? 'default' : 'outline'}
+              onClick={() => setViewMode('all')}
+            >
+              כל המשמרות
+            </Button>
             <Link to={createPageUrl('EmployeeConstraints')}>
               <Button variant="outline">
                 <ArrowRight className="w-4 h-4 ml-2" />
@@ -178,9 +246,17 @@ export default function EmployeeShifts() {
           </div>
         </div>
 
+        {viewMode === 'all' && (
+          <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4 mb-4">
+            <p className="text-sm text-blue-700">
+              💡 המשמרות שלך מסומנות עם ✓ וטבעת ירוקה
+            </p>
+          </div>
+        )}
+
         <MonthCalendar year={year} month={month} renderDay={renderDay} />
 
-        {shifts.length === 0 && (
+        {myShifts.length === 0 && viewMode === 'my' && (
           <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-6 text-center mt-6">
             <p className="text-lg text-yellow-800 font-medium">
               עדיין לא שובצת למשמרות בחודש זה

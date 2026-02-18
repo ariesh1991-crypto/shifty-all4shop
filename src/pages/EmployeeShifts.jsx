@@ -14,7 +14,10 @@ export default function EmployeeShifts() {
   const [currentEmployee, setCurrentEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
-  const [viewMode, setViewMode] = useState('my'); // 'my' או 'all'
+  const [viewMode, setViewMode] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('view') === 'all' ? 'all' : 'my';
+  });
 
   const year = getYear(currentDate);
   const month = getMonth(currentDate) + 1;

@@ -657,6 +657,25 @@ ${employeeList.slice(0, 10).map(e =>
           return false;
         }
 
+        // בדוק אם יש לעובד preference מפורש לסוג אחר - חסימה קשה!
+        const constraint = constraints.find(c => c.employee_id === empId && c.date === dateStr);
+        if (constraint?.preference) {
+          const prefersThisType =
+            (constraint.preference === 'מעדיף מסיים ב-17:30' && shiftType === 'מסיים ב-17:30') ||
+            (constraint.preference === 'מעדיף מסיים ב-19:00' && shiftType === 'מסיים ב-19:00') ||
+            (constraint.preference === 'מעדיף שישי קצר' && shiftType === 'שישי קצר') ||
+            (constraint.preference === 'מעדיף שישי ארוך' && shiftType === 'שישי ארוך');
+          const prefersOtherType =
+            (constraint.preference === 'מעדיף מסיים ב-17:30' && shiftType !== 'מסיים ב-17:30') ||
+            (constraint.preference === 'מעדיף מסיים ב-19:00' && shiftType !== 'מסיים ב-19:00') ||
+            (constraint.preference === 'מעדיף שישי קצר' && shiftType !== 'שישי קצר' && shiftType.includes('שישי')) ||
+            (constraint.preference === 'מעדיף שישי ארוך' && shiftType !== 'שישי ארוך' && shiftType.includes('שישי'));
+          if (prefersOtherType) {
+            if (isDebug) console.log(`${employee.full_name} מעדיף/ה ${constraint.preference} ולא ${shiftType} - חסימה קשה`);
+            return false;
+          }
+        }
+
         // חוק רוטציה חמישי קשיח - אל תיתן עובד שכבר עבד משמרת מהסוג הזה בחמישי
         // עד שכל העובדים האחרים עברו את הסבב
         if (isThursday) {

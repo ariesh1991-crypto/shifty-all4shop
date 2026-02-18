@@ -721,8 +721,8 @@ function ConstraintForm({ selectedDate, existingConstraint, onSave, onDelete }) 
                 </>
               ) : (
                 <>
-                  <SelectItem value="מעדיף משמרת מסיים ב-17:30">מעדיף משמרת מסיים ב-17:30</SelectItem>
-                  <SelectItem value="מעדיף משמרת מסיים ב-19:00">מעדיף משמרת מסיים ב-19:00</SelectItem>
+                  <SelectItem value="מעדיף מסיים ב-17:30">מעדיף מסיים ב-17:30</SelectItem>
+                  <SelectItem value="מעדיף מסיים ב-19:00">מעדיף מסיים ב-19:00</SelectItem>
                 </>
               )}
             </SelectContent>

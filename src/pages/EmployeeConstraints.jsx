@@ -366,7 +366,12 @@ export default function EmployeeConstraints() {
             <Link to={createPageUrl('EmployeeShifts')}>
               <Button variant="outline">
                 <ChevronRight className="w-4 h-4 ml-1" />
-                חזרה למשמרות
+                המשמרות שלי
+              </Button>
+            </Link>
+            <Link to={createPageUrl('EmployeeShifts') + '?view=all'}>
+              <Button variant="outline" className="bg-green-50 border-green-400 text-green-700 hover:bg-green-100">
+                👥 לוח משמרות מלא
               </Button>
             </Link>
             <Link to={createPageUrl('EmployeeSwaps')}>

@@ -998,6 +998,18 @@ ${employeeList.slice(0, 10).map(e =>
 
       // פונקציה לבחור עובד למשמרת (בחירה הוגנת + כיבוד העדפות)
       // פונקציית עזר לחישוב ציון עובד למשמרת (ככל שגבוה יותר - יותר טוב)
+      const hasHardPreference = (empId, dateStr, shiftType) => {
+        const constraint = constraints.find(c => c.employee_id === empId && c.date === dateStr);
+        if (!constraint?.preference) return false;
+        // העדפה קשה - אם יש העדפה לסוג שונה, זו חסימה
+        const prefersThisType =
+          (constraint.preference === 'מעדיף מסיים ב-17:30' && shiftType === 'מסיים ב-17:30') ||
+          (constraint.preference === 'מעדיף מסיים ב-19:00' && shiftType === 'מסיים ב-19:00') ||
+          (constraint.preference === 'מעדיף שישי קצר' && shiftType === 'שישי קצר') ||
+          (constraint.preference === 'מעדיף שישי ארוך' && shiftType === 'שישי ארוך');
+        return !prefersThisType; // מחזיר true אם ה-preference מונגד לסוג המשמרת הזה
+      };
+
       const calculateEmployeeScore = (empId, date, shiftType) => {
         const stats = employeeStats[empId];
         const employee = stats.employee;
